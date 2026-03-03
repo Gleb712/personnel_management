@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}Редактирование сотрудника{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h4><i class="fas fa-edit"></i> Редактирование сотрудника</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Табельный номер</label>
+                            <input type="text" class="form-control" 
+                                   value="{{ employee.employee_number }}" disabled>
+                            <small class="form-text text-muted">
+                                Табельный номер нельзя изменить
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">ФИО *</label>
+                            <input type="text" class="form-control" name="full_name" 
+                                   value="{{ employee.full_name }}" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Дата рождения</label>
+                            <input type="date" class="form-control" name="birth_date" 
+                                   value="{{ employee.birth_date|date:'Y-m-d' }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Дата приема на работу *</label>
+                            <input type="date" class="form-control" name="hire_date" 
+                                   value="{{ employee.hire_date|date:'Y-m-d' }}" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Дата увольнения</label>
+                            <input type="date" class="form-control" name="dismissal_date" 
+                                   value="{{ employee.dismissal_date|date:'Y-m-d' }}">
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'core:employee_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Назад
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Сохранить
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
