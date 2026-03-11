@@ -2,19 +2,23 @@ import pandas as pd
 from datetime import datetime, date
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Q
 from core.models import (
-    Employee, Production, Workshop, DismissalReason, 
+    Employee, Production, Workshop, DismissalReason,
     EmployeeCategory, Position
 )
 
 
 class EmployeeFileProcessor:
     """
+    
     Класс для обработки файлов с данными о сотрудниках
     С оптимизацией для быстрой загрузки больших файлов
-    """
     
+    Логика: новые записи - добавление, существующие - строгое обновление
+    Сейчас реализовано строгое обновление - пустое поле в файле записывает пустое значение поверх существующего в БД
+    Также реализовано мягкое обновление - пустое поле в файле не затирает существующее значение в БД (оно закоментировано, но помечено для быстрой замены)
+    """
+
     COLUMN_MAPPING = {
         'фио': 'full_name',
         'табельный номер': 'employee_number',
@@ -27,35 +31,36 @@ class EmployeeFileProcessor:
         'категория рабочего': 'employee_category',
         'должность': 'position',
     }
-    
-    def __init__(self, file, skip_duplicates=True, update_existing=False):
+
+    # Поля, по которым проходимся для обновления
+    UPDATE_FIELDS = [
+        'full_name', 'birth_date', 'hire_date', 'dismissal_date',
+        'production', 'workshop', 'dismissal_reason',
+        'employee_category', 'position',
+    ]
+
+    def __init__(self, file):
         """
         Инициализация обработчика файлов
         
         Args:
             file: Загруженный файл
-            skip_duplicates: Пропускать дубликаты
-            update_existing: Обновлять существующие записи
         """
         self.file = file
-        self.skip_duplicates = skip_duplicates
-        self.update_existing = update_existing
-        
         self.success_count = 0
-        self.skip_count = 0
         self.update_count = 0
+        self.error_count = 0
         self.errors = []
-        
-        # Кэши для справочников (загружаются один раз)
+
+        # Кэши для справочников — загружаются один раз
         self._production_cache = {}
         self._workshop_cache = {}
         self._dismissal_reason_cache = {}
         self._category_cache = {}
         self._position_cache = {}
-        
-        # Кэш существующих табельных номеров
-        self._existing_employee_numbers = set()
-    
+
+    # ========== Чтение файла ==========
+
     def read_file(self):
         """
         Чтение файлов Excel и CSV
@@ -64,299 +69,232 @@ class EmployeeFileProcessor:
             pandas.DataFrame: Таблица с данными
         """
         file_extension = self.file.name.split('.')[-1].lower()
-        
         try:
+            # Проверка для CSV
             if file_extension == 'csv':
-                encodings = ['utf-8', 'cp1251', 'utf-8-sig']
                 df = None
-                
-                for encoding in encodings:
+                last_error = None
+                for encoding in ['utf-8-sig', 'utf-8', 'cp1251', 'latin-1']:
                     try:
                         self.file.seek(0)
+                        raw = self.file.read()
+                        decoded = raw.decode(encoding)
+                        from io import StringIO
                         df = pd.read_csv(
-                            self.file,
-                            encoding=encoding,
-                            dtype={'табельный номер': str}
+                            StringIO(decoded),
+                            dtype=str,
+                            sep=None,
+                            engine='python'
                         )
                         break
                     except UnicodeDecodeError:
+                        last_error = encoding
                         continue
-                
+                    except Exception as e:
+                        last_error = f"Ошибка c {encoding}: {type(e).__name__}: {e}"
+                        continue
                 if df is None:
-                    raise ValidationError("Не удалось определить кодировку CSV файла")
-            
+                    raise ValidationError(f"Не удалось прочитать файл. Ошибка: {last_error}")
+                
+            # Проверка для Excel
             elif file_extension in ['xlsx', 'xls']:
                 self.file.seek(0)
-                df = pd.read_excel(self.file)
-                
-                # Преобразуем табельный номер в строку
-                if 'табельный номер' in df.columns:
-                    df['табельный номер'] = df['табельный номер'].astype(str)
-                
-                # Преобразуем цех в строку
-                if 'цех' in df.columns:
-                    df['цех'] = df['цех'].astype(str)
-            
+                df = pd.read_excel(self.file, dtype=str)
             else:
                 raise ValidationError(f"Неподдерживаемый формат: {file_extension}")
-            
-            return df
-        
+        except ValidationError:
+            raise
         except Exception as e:
-            raise ValidationError(f"Ошибка чтения файла: {str(e)}")
-    
-    def parse_date(self, date_value):
-        """
-        Преобразование значения в объект date
-        
-        Args:
-            date_value: Значение для преобразование, может быть:
-                - str
-                - datetime
-                - date
-                - None/NaN
-        
-        Returns:
-            date или None
-        """
-        if pd.isna(date_value) or date_value == '' or date_value is None:
-            return None
-        
-        if isinstance(date_value, datetime):
-            return date_value.date()
-        
-        if isinstance(date_value, date):
-            return date_value
-        
-        if isinstance(date_value, str):
-            date_formats = [
-                '%Y-%m-%d',
-                '%d.%m.%Y',
-                '%d/%m/%Y',
-                '%Y.%m.%d',
-            ]
-            
-            for fmt in date_formats:
-                try:
-                    return datetime.strptime(date_value.strip(), fmt).date()
-                except ValueError:
-                    continue
-            
-            raise ValueError(f"Неверный формат даты: {date_value}")
-        
-        return None
-    
-    def _load_reference_cache(self):
-        """
-        Загрузка всех справочников в память.
+            raise ValidationError(f"Ошибка чтения файла: {e}")
 
-        Выполняет 1 запрос к БД для каждого справочника и сохраняет результат в словари для быстрого доступа
-        """
-        # Загружаем все существующие записи одним запросом
-        self._production_cache = {
-            prod.name: prod 
-            for prod in Production.objects.all()
-        }
-        self._workshop_cache = {
-            ws.number: ws 
-            for ws in Workshop.objects.all()
-        }
-        self._dismissal_reason_cache = {
-            reason.name: reason 
-            for reason in DismissalReason.objects.all()
-        }
-        self._category_cache = {
-            cat.name: cat 
-            for cat in EmployeeCategory.objects.all()
-        }
-        self._position_cache = {
-            pos.name: pos 
-            for pos in Position.objects.all()
-        }
-    
-    def _get_or_create_reference(self, cache_dict, model, value, field_name='name'):
+        return df
+
+    # ========== Парсинг дат ==========
+
+    def parse_date(self, value):
+        if value is None or (isinstance(value, float) and pd.isna(value)):
+            return None
+        value = str(value).strip()
+        if not value or value.lower() in ('nan', 'nat', 'none', ''):
+            return None
+        for fmt in (
+            '%Y-%m-%d',
+            '%d.%m.%Y',
+            '%d/%m/%Y',
+            '%Y.%m.%d',
+            '%Y-%m-%d %H:%M:%S',
+            '%Y-%m-%d %H:%M:%S.%f',
+        ):
+            try:
+                return datetime.strptime(value, fmt).date()
+            except ValueError:
+                continue
+        raise ValueError(f"Неверный формат даты: {value}")
+
+    # ========== Справочники ==========
+
+    def _load_caches(self):
+        self._production_cache = {o.name: o for o in Production.objects.all()}
+        self._workshop_cache = {o.number: o for o in Workshop.objects.all()}
+        self._dismissal_reason_cache = {o.name: o for o in DismissalReason.objects.all()}
+        self._category_cache = {o.name: o for o in EmployeeCategory.objects.all()}
+        self._position_cache = {o.name: o for o in Position.objects.all()}
+
+    def _get_or_create(self, cache, model, value, field='name'):
         """
         Получить запись из кэша или создать новую запись в БД
 
         Args:
-            cache_dict: Словарь кэша для конкретного справочника
+            cache: Словарь кэша для конкретного справочника
             model: класс модели Django
             value: Значение для поиска
-            field_name: Название поля для поиска. По умолчанию 'name'
+            field: Название поля для поиска. По умолчанию 'name'
 
         Returns:
-            Объект модели или None
+            
         """
-        if not value or pd.isna(value):
-            return None
-        
-        value = str(value).strip()
-        
         if not value:
             return None
-        
-        # Проверяем кэш
-        if value in cache_dict:
-            return cache_dict[value]
-        
-        # Создаём новую запись
-        obj, created = model.objects.get_or_create(
-            **{field_name: value}
-        )
-        
-        # Добавляем в кэш
-        cache_dict[value] = obj
-        
-        return obj
-    
-    def _load_existing_employee_numbers(self):
-        """
-        Загрузка всех существующих табельных номеров в память
+        value = str(value).strip()
+        if not value or value.lower() in ('nan', 'none'):
+            return None
+        if value not in cache:
+            obj, _ = model.objects.get_or_create(**{field: value})
+            cache[value] = obj
+        return cache[value]
 
-        Выполняет 1 запрос к БД для получения все табельных номеров и сохраняет результат в множество для быстрой проверки дубликатов
-        """
-        self._existing_employee_numbers = set(
-            Employee.objects.values_list('employee_number', flat=True)
-        )
-    
-    def _get_reference_value(self, row_data, row_keys_lower, column_name):
-        """
-        Получение значения из строки по имени колонки
+    # ========== Парсинг одной строки ==========
 
-        Args:
-            row_data: Словарь с данными строки
-            row_keys_lower: Словарь mapping lowercase ключей
-            column_name: Имя колонки для поиска в нижнем регистре
-
-        Returns:
-            _type_: str или None
+    def _parse_row(self, row, row_num):
         """
-        key = row_keys_lower.get(column_name)
-        if key:
-            value = row_data[key]
-            if value and not pd.isna(value):
-                return str(value).strip()
-        return None
-    
-    def process_row(self, row_data, row_number):
+        Разобрать строку файла в словарь данных.
+        Возвращает dict или None если строку нужно пропустить.
         """
-        Обработка одной строки данных
+        # Приводим ключи к нижнему регистру для поиска
+        keys = {str(k).strip().lower(): k for k in row.keys()}
 
-        Извлекает данные, выполняет валидацию, проверяет дубликаты и создает объект Employee (без созранения в БД)
-        Args:
-            row_data: Словарь с данными  строки
-            row_number: Номер строки в файле
+        def get(col):
+            k = keys.get(col)
+            if k is None:
+                return None
+            v = row[k]
+            if v is None or (isinstance(v, float) and pd.isna(v)):
+                return None
+            v = str(v).strip()
+            return v if v and v.lower() not in ('nan', 'none', 'nat') else None
 
-        Raises:
-            ValidationError: Если отсутствуют обязательные поля или не прошло валидацию
+        # Обязательные поля
+        employee_number = get('табельный номер')
+        full_name = get('фио')
+        hire_date_raw = get('дата приема на работу')
 
-        Returns:
-            _type_: Employee или None
-        """
+        if not employee_number:
+            self.errors.append(f"Строка {row_num}: нет табельного номера — пропущена")
+            return None
+        if not full_name:
+            self.errors.append(f"Строка {row_num}: нет ФИО — пропущена")
+            return None
+        if not hire_date_raw:
+            self.errors.append(f"Строка {row_num}: нет даты приёма — пропущена")
+            return None
+
         try:
-            employee_data = {}
-            row_keys_lower = {str(k).strip().lower(): k for k in row_data.keys()}
-            
-            # Простые поля
-            key = row_keys_lower.get('фио')
-            if key:
-                value = row_data[key]
-                if isinstance(value, str):
-                    value = value.strip()
-                employee_data['full_name'] = value
-            
-            key = row_keys_lower.get('табельный номер')
-            if key:
-                value = row_data[key]
-                if pd.isna(value) or value == '':
-                    value = None
-                elif isinstance(value, str):
-                    value = value.strip()
-                else:
-                    value = str(value).strip()
-                employee_data['employee_number'] = value
-            
-            key = row_keys_lower.get('дата рождения')
-            if key:
-                employee_data['birth_date'] = self.parse_date(row_data[key])
-            
-            key = row_keys_lower.get('дата приема на работу')
-            if key:
-                employee_data['hire_date'] = self.parse_date(row_data[key])
-            
-            key = row_keys_lower.get('дата увольнения')
-            if key:
-                employee_data['dismissal_date'] = self.parse_date(row_data[key])
-            
-            # Проверка обязательных полей
-            if not employee_data.get('employee_number'):
-                raise ValidationError(f"Строка {row_number}: Отсутствует табельный номер")
-            
-            if not employee_data.get('full_name'):
-                raise ValidationError(f"Строка {row_number}: Отсутствует ФИО")
-            
-            if not employee_data.get('hire_date'):
-                raise ValidationError(f"Строка {row_number}: Отсутствует дата приема")
-            
-            # Проверка дубликатов (через кэш, без запроса к БД)
-            if employee_data['employee_number'] in self._existing_employee_numbers:
-                if self.skip_duplicates:
-                    self.skip_count += 1
-                    return None
-                elif self.update_existing:
-                    # Для обновления нужно будет загрузить объект отдельно
-                    self.skip_count += 1
-                    return None
-                else:
-                    raise ValidationError(
-                        f"Строка {row_number}: Сотрудник с табельным номером "
-                        f"{employee_data['employee_number']} уже существует"
-                    )
-            
-            # Справочники (из кэша или создание)
-            production_value = self._get_reference_value(row_data, row_keys_lower, 'производство')
-            if production_value:
-                employee_data['production'] = self._get_or_create_reference(
-                    self._production_cache, Production, production_value
-                )
-            
-            workshop_value = self._get_reference_value(row_data, row_keys_lower, 'цех')
-            if workshop_value:
-                workshop = self._get_or_create_reference(
-                    self._workshop_cache, Workshop, workshop_value, field_name='number'
-                )
-                employee_data['workshop'] = workshop
-            
-            dismissal_reason_value = self._get_reference_value(row_data, row_keys_lower, 'причина увольнения')
-            if dismissal_reason_value:
-                employee_data['dismissal_reason'] = self._get_or_create_reference(
-                    self._dismissal_reason_cache, DismissalReason, dismissal_reason_value
-                )
-            
-            category_value = self._get_reference_value(row_data, row_keys_lower, 'категория рабочего')
-            if category_value:
-                employee_data['employee_category'] = self._get_or_create_reference(
-                    self._category_cache, EmployeeCategory, category_value
-                )
-            
-            position_value = self._get_reference_value(row_data, row_keys_lower, 'должность')
-            if position_value:
-                employee_data['position'] = self._get_or_create_reference(
-                    self._position_cache, Position, position_value
-                )
-            
-            # Создаём объект (без сохранения)
-            employee = Employee(**employee_data)
-            
-            return employee
-            
-        except ValidationError as e:
-            self.errors.append(str(e))
+            hire_date = self.parse_date(hire_date_raw)
+        except ValueError as e:
+            self.errors.append(f"Строка {row_num}: {e}")
             return None
-        except Exception as e:
-            self.errors.append(f"Строка {row_number}: {str(e)}")
-            return None
-    
+
+        data = {
+            'employee_number': employee_number,
+            'full_name': full_name,
+            'hire_date': hire_date,
+        }
+
+        # Для мягкого обновления
+        # Необязательные даты (пропускаем или пусто)
+        """
+        for col, field in [('дата рождения', 'birth_date'), ('дата увольнения', 'dismissal_date')]:
+            raw = get(col)
+            if raw:
+                try:
+                    data[field] = self.parse_date(raw)
+                except ValueError as e:
+                    self.errors.append(f"Строка {row_num}: {e}")
+        """
+
+        # Для строгого обновления
+        # Всегда пишем в data, даже None
+        for col, field in [('дата рождения', 'birth_date'), ('дата увольнения', 'dismissal_date')]:
+            if col in keys:  # есть ли колонка в файле
+                raw = get(col)
+                if raw:
+                    try:
+                        data[field] = self.parse_date(raw)
+                    except ValueError as e:
+                        self.errors.append(f"Строка {row_num}: {e}")
+                        data[field] = None  # ошибка парсинга = нет данных
+                else:
+                    data[field] = None  # пустая ячейка = None
+
+        # Для мягкого обновления
+        # Только если значение есть в файле
+        """
+        production_val = get('производство')
+        if production_val:
+            data['production'] = self._get_or_create(self._production_cache, Production, production_val)
+
+        workshop_val = get('цех')
+        if workshop_val:
+            data['workshop'] = self._get_or_create(self._workshop_cache, Workshop, workshop_val, field='number')
+
+        dismissal_val = get('причина увольнения')
+        if dismissal_val:
+            data['dismissal_reason'] = self._get_or_create(self._dismissal_reason_cache, DismissalReason, dismissal_val)
+
+        category_val = get('категория рабочего')
+        if category_val:
+            data['employee_category'] = self._get_or_create( self._category_cache, EmployeeCategory, category_val)
+
+        position_val = get('должность')
+        if position_val:
+            data['position'] = self._get_or_create(self._position_cache, Position, position_val)
+        """
+
+        # Для строгого обновления
+        if 'производство' in keys:
+            production_val = get('производство')
+            data['production'] = self._get_or_create(
+                self._production_cache, Production, production_val
+            ) if production_val else None
+
+        if 'цех' in keys:
+            workshop_val = get('цех')
+            data['workshop'] = self._get_or_create(
+                self._workshop_cache, Workshop, workshop_val, field='number'
+            ) if workshop_val else None
+
+        if 'причина увольнения' in keys:
+            dismissal_val = get('причина увольнения')
+            data['dismissal_reason'] = self._get_or_create(
+                self._dismissal_reason_cache, DismissalReason, dismissal_val
+            ) if dismissal_val else None
+
+        if 'категория рабочего' in keys:
+            category_val = get('категория рабочего')
+            data['employee_category'] = self._get_or_create(
+                self._category_cache, EmployeeCategory, category_val
+            ) if category_val else None
+
+        if 'должность' in keys:
+            position_val = get('должность')
+            data['position'] = self._get_or_create(
+                self._position_cache, Position, position_val
+            ) if position_val else None
+
+        return data
+
+    # ========== Основной метод ==========
+
     @transaction.atomic
     def process(self):
         """
@@ -365,73 +303,100 @@ class EmployeeFileProcessor:
         Returns:
             dict: Статистика обработки
         """
-        from django.db import connection
-        start_time = datetime.now()
-        
-        # Чтение файла
+        start = datetime.now()
+
         df = self.read_file()
-        
-        print(f"\nВСЕГО СТРОК В ФАЙЛЕ: {len(df)}")
-        print(f"КОЛОНКИ: {df.columns.tolist()}")
-        
         if df.empty:
             raise ValidationError("Файл пустой")
-        
-        df.columns = [str(col).strip().lower() for col in df.columns]
-        
-        # Фильтрация
-        if len(df) > 0:
-            first_col = df.iloc[:, 0].astype(str).str.lower().str.strip()
-            df = df[~first_col.isin(['фио', '---'])]
-            df = df.reset_index(drop=True)
-            print(f"ПОСЛЕ ОЧИСТКИ: {len(df)} строк")
-        
-        # Проверка колонок
-        required_columns = [col.lower() for col in self.COLUMN_MAPPING.keys()]
-        missing_columns = set(required_columns) - set(df.columns)
-        
-        if missing_columns:
-            raise ValidationError(
-                f"В файле отсутствуют необходимые колонки: {', '.join(missing_columns)}"
-            )
-        
-        # === ОПТИМИЗАЦИЯ: Загружаем кэши ===
-        print("\nЗагрузка справочников в память...")
-        self._load_reference_cache()
-        print(f"  Загружено производств: {len(self._production_cache)}")
-        print(f"  Загружено цехов: {len(self._workshop_cache)}")
-        
-        print("Загрузка существующих табельных номеров...")
-        self._load_existing_employee_numbers()
-        print(f"  Найдено существующих сотрудников: {len(self._existing_employee_numbers)}")
-        # =================================
-        
-        # Обработка всех строк (без сохранения)
-        print("\nОбработка строк...")
-        employees_to_create = []
-        
-        for index, row in df.iterrows():
-            row_number = index + 2
-            employee = self.process_row(row.to_dict(), row_number)
-            if employee:
-                employees_to_create.append(employee)
-        
-        # Оптимизация: Bulk create
-        print(f"\nСохранение {len(employees_to_create)} записей...")
-        
-        if employees_to_create:
-            Employee.objects.bulk_create(employees_to_create, batch_size=1000)
-            self.success_count = len(employees_to_create)
-        
-        end_time = datetime.now()
-        duration = (end_time - start_time).total_seconds()
-        
+
+        # Нормализуем заголовки
+        df.columns = [str(c).strip().lower() for c in df.columns]
+
+        # Убираем строки-заголовки попавшие в данные
+        first_col = df.iloc[:, 0].astype(str).str.strip().str.lower()
+        df = df[~first_col.isin(['фио', '---', 'nan'])].reset_index(drop=True)
+
+        # Проверка обязательных колонок
+        required = {'фио', 'табельный номер', 'дата приема на работу'}
+        missing = required - set(df.columns)
+        if missing:
+            raise ValidationError(f"Отсутствуют колонки: {', '.join(missing)}")
+
+        # Загружаем справочники в кэш
+        self._load_caches()
+
+        # Загружаем существующих сотрудников одним запросом
+        existing_employees = {
+            e.employee_number: e
+            for e in Employee.objects.all()
+        }
+
+        # Разбираем строки
+        to_create = []  # новые — Employee объекты
+        to_update = []  # существующие — (employee_obj, data_dict)
+
+        for idx, row in df.iterrows():
+            data = self._parse_row(row.to_dict(), idx + 2)
+            if data is None:
+                self.error_count += 1
+                continue
+
+            emp_number = data['employee_number']
+
+            if emp_number in existing_employees:
+                # Существующий — мягкое обновление:
+                # обновляем только те поля, которые не пустые в файле
+                to_update.append((existing_employees[emp_number], data))
+            else:
+                # Новый сотрудник
+                to_create.append(Employee(**data))
+
+        # Создаём новых одним запросом
+        if to_create:
+            Employee.objects.bulk_create(to_create, batch_size=500)
+            self.success_count = len(to_create)
+
+        # Обновляем существующих — мягко: пустое поле в файле = не трогаем
+        if to_update:
+            updated_objects = []
+            for emp, data in to_update:
+                changed = False
+                # Мягкое обновление данных - если данные в загруженном файле и БД расходятся - приоритет у БД
+                # Когда нужно: забыли указать дату увольнения в выгрузке
+                """
+                for field in self.UPDATE_FIELDS:
+                    if field in data and data[field] is not None:
+                        # Обновляем только если значение пришло из файла
+                        setattr(emp, field, data[field])
+                        changed = True
+                """
+                # Строгое обновление данных - если данные в загруженном файле и БД расходятся - приоритет у загруженного файла
+                # Когда нужно: работник заново устроился, дата увольнения стирается из БД
+                for field in self.UPDATE_FIELDS:
+                    if field in data:
+                        new_val = data[field]  # может быть None
+                        if getattr(emp, field) != new_val:
+                            setattr(emp, field, new_val)
+                            changed = True
+                if changed:
+                    updated_objects.append(emp)
+
+            if updated_objects:
+                Employee.objects.bulk_update(
+                    updated_objects,
+                    self.UPDATE_FIELDS,
+                    batch_size=500
+                )
+                self.update_count = len(updated_objects)
+
+        duration = (datetime.now() - start).total_seconds()
+
         return {
             'success': self.success_count,
-            'skipped': self.skip_count,
             'updated': self.update_count,
             'errors': self.errors,
+            'error_count': self.error_count,
             'total': len(df),
-            'duration': duration
+            'duration': duration,
         }
     

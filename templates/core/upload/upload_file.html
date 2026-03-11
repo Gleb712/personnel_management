@@ -1,145 +1,189 @@
 {% extends 'base.html' %}
+{% block title %}Загрузка файлов{% endblock %}
+{% block page_title %}Загрузка данных{% endblock %}
+{% block nav_upload %}active{% endblock %}
 
-{% block title %}Загрузка сотрудников{% endblock %}
+{% block topbar_actions %}
+<a href="{% url 'core:employee_list' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-people me-1"></i>К списку сотрудников
+</a>
+{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-md-10 offset-md-1">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">
-                        <i class="fas fa-file-upload"></i> 
-                        Загрузка данных сотрудников
-                    </h4>
-                </div>
-                <div class="card-body">
-                    
-                    <!-- Информация о формате -->
-                    <div class="alert alert-info">
-                        <h5><i class="fas fa-info-circle"></i> Требования к файлу:</h5>
-                        <ul class="mb-0">
-                            <li>Поддерживаемые форматы: <strong>CSV, XLSX, XLS</strong></li>
-                            <li>Максимальный размер: <strong>10 MB</strong></li>
-                            <li>Обязательные колонки:
-                                <ul>
-                                    <li>ФИО</li>
-                                    <li>табельный номер</li>
-                                    <li>дата приема на работу</li>
-                                </ul>
-                            </li>
-                            <li>Необязательные колонки:
-                                <ul>
-                                    <li>дата рождения</li>
-                                    <li>дата увольнения</li>
-                                    <li>производство</li>
-                                    <li>цех</li>
-                                    <li>причина увольнения</li>
-                                    <li>категория рабочего</li>
-                                    <li>должность</li>
-                                </ul>
-                            </li>
-                        </ul>
-                    </div>
+<div class="row g-4">
 
-                    <!-- Форма загрузки -->
-                    <form method="post" enctype="multipart/form-data">
-                        {% csrf_token %}
-                        
-                        <div class="mb-3">
-                            <label for="{{ form.file.id_for_label }}" class="form-label">
-                                {{ form.file.label }}
-                            </label>
-                            {{ form.file }}
-                            {% if form.file.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.file.errors|join:", " }}
-                                </div>
-                            {% endif %}
-                            <div class="form-text">{{ form.file.field.help_text }}</div>
-                        </div>
-
-                        <div class="mb-3">
-                            <div class="form-check">
-                                {{ form.skip_duplicates }}
-                                <label class="form-check-label" for="{{ form.skip_duplicates.id_for_label }}">
-                                    {{ form.skip_duplicates.label }}
-                                </label>
-                                <div class="form-text">{{ form.skip_duplicates.field.help_text }}</div>
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <div class="form-check">
-                                {{ form.update_existing }}
-                                <label class="form-check-label" for="{{ form.update_existing.id_for_label }}">
-                                    {{ form.update_existing.label }}
-                                </label>
-                                <div class="form-text">{{ form.update_existing.field.help_text }}</div>
-                            </div>
-                        </div>
-
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-start">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-upload"></i> Загрузить файл
-                            </button>
-                            <a href="{% url 'core:employee_list' %}" class="btn btn-secondary">
-                                <i class="fas fa-list"></i> К списку сотрудников
-                            </a>
-                        </div>
-                    </form>
-
-                    <!-- Ошибки -->
-                    {% if errors %}
-                    <div class="mt-4">
-                        <h5><i class="fas fa-exclamation-triangle"></i> Ошибки при загрузке:</h5>
-                        <div class="alert alert-warning">
-                            <ul class="mb-0" style="max-height: 300px; overflow-y: auto;">
-                                {% for error in errors %}
-                                    <li>{{ error }}</li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
+    <!-- Левая колонка: форма -->
+    <div class="col-xl-7">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-cloud-upload" style="color:var(--accent)"></i>
+                Загрузка файла
             </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data" id="upload-form">
+                    {% csrf_token %}
 
-            <!-- Пример файла -->
-            <div class="card mt-4">
-                <div class="card-header">
-                    <h5><i class="fas fa-table"></i> Пример структуры файла</h5>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-bordered">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>ФИО</th>
-                                    <th>табельный номер</th>
-                                    <th>дата рождения</th>
-                                    <th>дата приема на работу</th>
-                                    <th>производство</th>
-                                    <th>цех</th>
-                                    <th>должность</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>Иванов Иван Иванович</td>
-                                    <td>12345</td>
-                                    <td>1990-05-15</td>
-                                    <td>2020-01-10</td>
-                                    <td>Металлургическое производство</td>
-                                    <td>100</td>
-                                    <td>Сталевар</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <!-- Drop zone -->
+                    <div id="drop-zone"
+                         style="border:2px dashed var(--border);border-radius:10px;padding:40px 20px;
+                                text-align:center;cursor:pointer;transition:all .2s;margin-bottom:20px;"
+                         onclick="document.getElementById('id_file').click()">
+                        <i class="bi bi-file-earmark-spreadsheet"
+                           style="font-size:40px;color:var(--text-muted);display:block;margin-bottom:10px"></i>
+                        <div style="font-weight:600;color:var(--text-primary);margin-bottom:4px">
+                            Перетащите файл сюда
+                        </div>
+                        <div style="font-size:12px;color:var(--text-muted)">
+                            или нажмите для выбора · CSV, XLSX, XLS · до 10 МБ
+                        </div>
+                        <div id="file-name-label"
+                             style="display:none;margin-top:12px;font-size:12px;
+                                    color:var(--accent);font-weight:500"></div>
                     </div>
+
+                    <!-- Скрытый input -->
+                    <div style="display:none">{{ form.file }}</div>
+                    {% if form.file.errors %}
+                        <div style="color:#f87171;font-size:12px;margin-top:-12px;margin-bottom:14px">
+                            {{ form.file.errors|join:", " }}
+                        </div>
+                    {% endif %}
+
+                    <button type="submit" class="btn btn-primary w-100" id="submit-btn">
+                        <i class="bi bi-upload me-1"></i> Загрузить файл
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Ошибки строк -->
+        {% if errors %}
+        <div class="card mt-4">
+            <div class="card-header" style="color:#f87171">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                Ошибки при загрузке — {{ errors|length }} строк
+            </div>
+            <div style="max-height:260px;overflow-y:auto;">
+                {% for error in errors %}
+                <div style="padding:8px 18px;border-bottom:1px solid var(--border);
+                            font-size:12px;color:var(--text-secondary);">
+                    <i class="bi bi-x-circle me-1" style="color:#f87171"></i>{{ error }}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Правая колонка: справка -->
+    <div class="col-xl-5">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle" style="color:var(--accent)"></i>
+                Требования к файлу
+            </div>
+            <div class="card-body">
+
+                <div style="margin-bottom:16px">
+                    <div class="stat-lbl" style="margin-bottom:6px">Форматы</div>
+                    <span class="badge bg-secondary me-1">CSV</span>
+                    <span class="badge bg-secondary me-1">XLSX</span>
+                    <span class="badge bg-secondary">XLS</span>
+                </div>
+
+                <div style="margin-bottom:16px">
+                    <div class="stat-lbl" style="margin-bottom:8px">
+                        Обязательные колонки
+                        <span style="color:#f87171;margin-left:4px">*</span>
+                    </div>
+                    {% for col in required_columns %}
+                    <div style="font-size:12px;padding:5px 0;color:var(--text-primary);
+                                border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px">
+                        <i class="bi bi-asterisk" style="color:#ef4444;font-size:9px"></i>{{ col }}
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div>
+                    <div class="stat-lbl" style="margin-bottom:8px">Необязательные колонки</div>
+                    {% for col in optional_columns %}
+                    <div style="font-size:12px;padding:5px 0;color:var(--text-secondary);
+                                border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px">
+                        <i class="bi bi-dash" style="color:var(--text-muted)"></i>{{ col }}
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
         </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="bi bi-table" style="color:#22c55e"></i>
+                Пример структуры файла
+            </div>
+            <div style="overflow-x:auto">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>ФИО</th>
+                            <th>Таб. №</th>
+                            <th>Дата приёма</th>
+                            <th>Цех</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="font-size:12px">Иванов И.И.</td>
+                            <td><code>12345</code></td>
+                            <td style="font-size:12px">2020-01-10</td>
+                            <td style="font-size:12px">100</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
+
 </div>
+
+<script>
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('id_file');
+const label    = document.getElementById('file-name-label');
+
+function setFile(file) {
+    if (!file) return;
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    fileInput.files = dt.files;
+    label.textContent = '📄 ' + file.name;
+    label.style.display = 'block';
+    dropZone.style.borderColor = 'var(--accent)';
+    dropZone.style.background  = 'var(--accent-dim)';
+}
+
+fileInput.addEventListener('change', () => setFile(fileInput.files[0]));
+
+['dragover','dragenter'].forEach(ev => dropZone.addEventListener(ev, e => {
+    e.preventDefault();
+    dropZone.style.borderColor = 'var(--accent)';
+    dropZone.style.background  = 'var(--accent-dim)';
+}));
+['dragleave','dragend'].forEach(ev => dropZone.addEventListener(ev, () => {
+    if (!fileInput.files[0]) {
+        dropZone.style.borderColor = 'var(--border)';
+        dropZone.style.background  = '';
+    }
+}));
+dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    setFile(e.dataTransfer.files[0]);
+});
+
+document.getElementById('upload-form').addEventListener('submit', function() {
+    const btn = document.getElementById('submit-btn');
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Загрузка...';
+    btn.disabled = true;
+});
+</script>
 {% endblock %}

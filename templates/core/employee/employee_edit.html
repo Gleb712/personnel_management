@@ -1,64 +1,104 @@
 {% extends 'base.html' %}
-
 {% block title %}Редактирование сотрудника{% endblock %}
+{% block page_title %}Редактирование сотрудника{% endblock %}
+{% block nav_employees %}active{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'core:employee_list' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Назад к списку
+</a>
+{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-md-8 offset-md-2">
-            <div class="card">
-                <div class="card-header">
-                    <h4><i class="fas fa-edit"></i> Редактирование сотрудника</h4>
+<div class="row justify-content-center">
+<div class="col-xl-7 col-lg-9">
+
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-pencil-square" style="color:var(--accent)"></i>
+            {{ employee.full_name }}
+            <code style="margin-left:8px;font-size:11px">№ {{ employee.employee_number }}</code>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+
+                <!-- Неизменяемый таб. номер -->
+                <div class="mb-3">
+                    <label class="form-label">Табельный номер</label>
+                    <input type="text" class="form-control" value="{{ employee.employee_number }}" disabled>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+                        Табельный номер нельзя изменить
+                    </div>
                 </div>
-                <div class="card-body">
-                    <form method="post">
-                        {% csrf_token %}
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Табельный номер</label>
-                            <input type="text" class="form-control" 
-                                   value="{{ employee.employee_number }}" disabled>
-                            <small class="form-text text-muted">
-                                Табельный номер нельзя изменить
-                            </small>
-                        </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">ФИО *</label>
-                            <input type="text" class="form-control" name="full_name" 
-                                   value="{{ employee.full_name }}" required>
-                        </div>
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">{{ form.full_name.label }} *</label>
+                        {{ form.full_name }}
+                        {% if form.full_name.errors %}
+                            <div style="color:#f87171;font-size:12px;margin-top:4px">{{ form.full_name.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Дата рождения</label>
-                            <input type="date" class="form-control" name="birth_date" 
-                                   value="{{ employee.birth_date|date:'Y-m-d' }}">
-                        </div>
+                    <div class="col-md-4">
+                        <label class="form-label">{{ form.birth_date.label }}</label>
+                        {{ form.birth_date }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">{{ form.hire_date.label }} *</label>
+                        {{ form.hire_date }}
+                        {% if form.hire_date.errors %}
+                            <div style="color:#f87171;font-size:12px;margin-top:4px">{{ form.hire_date.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">{{ form.dismissal_date.label }}</label>
+                        {{ form.dismissal_date }}
+                    </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Дата приема на работу *</label>
-                            <input type="date" class="form-control" name="hire_date" 
-                                   value="{{ employee.hire_date|date:'Y-m-d' }}" required>
-                        </div>
+                    <div class="col-md-6">
+                        <label class="form-label">{{ form.production.label }}</label>
+                        {{ form.production }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">{{ form.workshop.label }}</label>
+                        {{ form.workshop }}
+                    </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Дата увольнения</label>
-                            <input type="date" class="form-control" name="dismissal_date" 
-                                   value="{{ employee.dismissal_date|date:'Y-m-d' }}">
-                        </div>
+                    <div class="col-md-6">
+                        <label class="form-label">{{ form.position.label }}</label>
+                        {{ form.position }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">{{ form.employee_category.label }}</label>
+                        {{ form.employee_category }}
+                    </div>
 
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <a href="{% url 'core:employee_list' %}" class="btn btn-secondary">
-                                <i class="fas fa-arrow-left"></i> Назад
-                            </a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> Сохранить
-                            </button>
-                        </div>
-                    </form>
+                    <div class="col-12">
+                        <label class="form-label">{{ form.dismissal_reason.label }}</label>
+                        {{ form.dismissal_reason }}
+                    </div>
                 </div>
-            </div>
+
+                {% if form.non_field_errors %}
+                <div style="color:#f87171;font-size:12px;margin-top:12px">
+                    {{ form.non_field_errors|join:", " }}
+                </div>
+                {% endif %}
+
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <a href="{% url 'core:employee_list' %}" class="btn btn-outline-secondary">
+                        Отмена
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>Сохранить
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
+
+</div>
 </div>
 {% endblock %}

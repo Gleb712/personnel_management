@@ -1,4 +1,5 @@
 from django import forms
+from .models import Employee
 
 
 class FileUploadForm(forms.Form):
@@ -18,22 +19,6 @@ class FileUploadForm(forms.Form):
         })
     )
 
-    # Пропуск дубликатов
-    skip_duplicates = forms.BooleanField(
-        label='Пропускать дубликаты',
-        required=False,
-        initial=False,
-        help_text="Если сотрудник с таким табельным номером уже существует - пропустить"
-    )
-
-    # Обновление существующих записей
-    update_existing = forms.BooleanField(
-        label='Обновлять сущствующие записи',
-        required=False,
-        initial=True,
-        help_text="Если сотрудник уже существует - обновить его данные"
-    )
-
     def clean_file(self):
         """
         Метод валидации данных из Django Forms
@@ -45,19 +30,53 @@ class FileUploadForm(forms.Form):
             raise forms.ValidationError('Файл не загружен')
         
         # Проверка расширения файла
-        allowed_extensions = ['csv', 'xlsx', 'xls']
-        file_extension = file.name.split('.')[-1].lower()
-
-        if file_extension not in allowed_extensions:
-            raise forms.ValidationError(
-                f"Неподдерживаемый формат файла. "
-                f"Разрешенные форматы файлов: {','.join(allowed_extensions)}"
-            )
+        ext = file.name.split('.')[-1].lower()
+        if ext not in ['csv', 'xlsx', 'xls']:
+            raise forms.ValidationError(f"Неподдерживаемый формат. Разрешены: csv, xlsx, xls")
         
         # Проверка размера файла
-        max_size = 10 * 1024 * 1024
-        if file.size > max_size:
-            raise forms.ValidationError("Размер загружаемого файла не должен превышать 10Мб")
-        
+        if file.size > 10 * 1024 * 1024:
+            raise forms.ValidationError("Размер файла не должен превышать 10 МБ")
         return file
-    
+
+
+class EmployeeEditForm(forms.ModelForm):
+    class Meta:
+        model = Employee
+        fields = [
+            'full_name', 'birth_date', 'hire_date', 'dismissal_date',
+            'production', 'workshop', 'position', 'employee_category', 'dismissal_reason'
+        ]
+        widgets = {
+            'full_name': forms.TextInput(
+                attrs={'class': 'form-control'}
+            ),
+            'birth_date': forms.DateInput(
+                format='%Y-%m-%d',
+                attrs={'class': 'form-control', 'type': 'date'}
+            ),
+            'hire_date': forms.DateInput(
+                format='%Y-%m-%d',
+                attrs={'class': 'form-control', 'type': 'date'}
+            ),
+            'dismissal_date': forms.DateInput(
+                format='%Y-%m-%d',
+                attrs={'class': 'form-control', 'type': 'date'}
+            ),
+            'production': forms.Select(
+                attrs={'class': 'form-select'}
+            ),
+            'workshop': forms.Select(
+                attrs={'class': 'form-select'}
+            ),
+            'position': forms.Select(
+                attrs={'class': 'form-select'}
+            ),
+            'employee_category': forms.Select(
+                attrs={'class': 'form-select'}
+            ),
+            'dismissal_reason': forms.Select(
+                attrs={'class': 'form-select'}
+            ),
+        }
+        

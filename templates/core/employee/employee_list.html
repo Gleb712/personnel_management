@@ -1,93 +1,96 @@
 {% extends 'base.html' %}
+{% block title %}Сотрудники{% endblock %}
+{% block page_title %}Сотрудники{% endblock %}
+{% block nav_employees %}active{% endblock %}
 
-{% block title %}Список сотрудников{% endblock %}
+{% block topbar_actions %}
+<a href="{% url 'core:upload_file' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-upload me-1"></i>Загрузить файл
+</a>
+{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="fas fa-users"></i> Сотрудники</h2>
-        <div>
-            <a href="{% url 'core:upload_file' %}" class="btn btn-primary">
-                <i class="fas fa-upload"></i> Загрузить файл
-            </a>
-            <span class="badge bg-secondary ms-2">Всего: {{ total_count }}</span>
-        </div>
-    </div>
 
-    <!-- Таблица сотрудников -->
-    <div class="card">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover table-bordered">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Табельный номер</th>
-                            <th>ФИО</th>
-                            <th>Дата рождения</th>
-                            <th>Дата приема</th>
-                            <th>Дата увольнения</th>
-                            <th>Производство</th>
-                            <th>Цех</th>
-                            <th>Должность</th>
-                            <th>Действия</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for employee in page_obj %}
-                        <tr>
-                            <td>{{ employee.employee_number }}</td>
-                            <td>{{ employee.full_name }}</td>
-                            <td>{{ employee.birth_date|default:"—" }}</td>
-                            <td>{{ employee.hire_date|default:"—" }}</td>
-                            <td>{{ employee.dismissal_date|default:"—" }}</td>
-                            <td>{{ employee.production|default:"—" }}</td>
-                            <td>{{ employee.workshop|default:"—" }}</td>
-                            <td>{{ employee.position|default:"—" }}</td>
-                            <td>
-                                <a href="{% url 'core:employee_edit' employee.employee_number %}" 
-                                   class="btn btn-sm btn-warning">
-                                    <i class="fas fa-edit"></i>
-                                </a>
-                                <a href="{% url 'core:employee_delete' employee.employee_number %}" 
-                                   class="btn btn-sm btn-danger">
-                                    <i class="fas fa-trash"></i>
-                                </a>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="9" class="text-center">Сотрудники не найдены</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Пагинация -->
-            {% if page_obj.has_other_pages %}
-            <nav aria-label="Пагинация">
-                <ul class="pagination justify-content-center">
-                    {% if page_obj.has_previous %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}">←</a>
-                    </li>
-                    {% endif %}
-
-                    <li class="page-item active">
-                        <span class="page-link">
-                            Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}
-                        </span>
-                    </li>
-
-                    {% if page_obj.has_next %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.next_page_number }}">→</a>
-                    </li>
-                    {% endif %}
-                </ul>
-            </nav>
-            {% endif %}
+<!-- Статы -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-num">{{ total_count }}</div>
+            <div class="stat-lbl">Всего записей</div>
         </div>
     </div>
 </div>
+
+<!-- Фильтры -->
+<div class="card mb-4">
+    <div class="card-body" style="padding:14px 18px">
+        <div class="row g-2 align-items-end"
+             id="filter-row"
+             hx-get="{% url 'core:employee_list' %}"
+             hx-target="#table-wrap"
+             hx-trigger="change from:.auto-filter"
+             hx-include="#filter-row"
+             hx-push-url="true">
+
+            <div class="col-md-4">
+                <label class="form-label">Поиск</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control auto-filter" name="search"
+                           value="{{ search }}" placeholder="ФИО или табельный номер"
+                           hx-get="{% url 'core:employee_list' %}"
+                           hx-target="#table-wrap"
+                           hx-trigger="keyup changed delay:350ms"
+                           hx-include="#filter-row"
+                           hx-push-url="true">
+                </div>
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">Производство</label>
+                <select class="form-select form-select-sm auto-filter" name="production">
+                    <option value="">Все</option>
+                    {% for p in productions %}
+                    <option value="{{ p.id }}" {% if selected_production == p.id|stringformat:"s" %}selected{% endif %}>
+                        {{ p.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">Цех</label>
+                <select class="form-select form-select-sm auto-filter" name="workshop">
+                    <option value="">Все</option>
+                    {% for w in workshops %}
+                    <option value="{{ w.id }}" {% if selected_workshop == w.id|stringformat:"s" %}selected{% endif %}>
+                        Цех {{ w.number }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">Статус</label>
+                <select class="form-select form-select-sm auto-filter" name="status">
+                    <option value="">Все</option>
+                    <option value="active"    {% if selected_status == 'active'    %}selected{% endif %}>Работают</option>
+                    <option value="dismissed" {% if selected_status == 'dismissed' %}selected{% endif %}>Уволены</option>
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <a href="{% url 'core:employee_list' %}" class="btn btn-outline-secondary btn-sm w-100">
+                    <i class="bi bi-x me-1"></i>Сбросить
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Таблица -->
+<div id="table-wrap">
+    {% include 'core/employee/partials/employee_table.html' %}
+</div>
+
 {% endblock %}

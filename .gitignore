@@ -1,6 +1,9 @@
 /.idea
 /.venv
+/.env
 /create_table.py
 /main.py
+/test.csv
 /test.xlsx
 /wheels
+/static/vendors

@@ -1,0 +1,95 @@
+<div class="card">
+    <div class="card-header justify-content-between">
+        <span>
+            <i class="bi bi-table" style="color:var(--accent)"></i>
+            Найдено: <strong>{{ total_count }}</strong>
+        </span>
+        <span class="htmx-indicator spinner-border spinner-border-sm" style="color:var(--accent)"></span>
+    </div>
+    <div style="overflow-x:auto">
+        <table class="table mb-0">
+            <thead>
+                <tr>
+                    <th>Таб. №</th>
+                    <th>ФИО</th>
+                    <th>Дата рождения</th>
+                    <th>Принят</th>
+                    <th>Уволен</th>
+                    <th>Производство</th>
+                    <th>Цех</th>
+                    <th>Должность</th>
+                    <th>Статус</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in page_obj %}
+                <tr>
+                    <td><code>{{ e.employee_number }}</code></td>
+                    <td style="font-weight:500;color:var(--text-primary)">{{ e.full_name }}</td>
+                    <td>{{ e.birth_date|date:"d.m.Y"|default:"—" }}</td>
+                    <td>{{ e.hire_date|date:"d.m.Y" }}</td>
+                    <td>{{ e.dismissal_date|date:"d.m.Y"|default:"—" }}</td>
+                    <td style="color:var(--text-secondary)">{{ e.production|default:"—" }}</td>
+                    <td style="color:var(--text-secondary)">{{ e.workshop|default:"—" }}</td>
+                    <td style="color:var(--text-secondary)">{{ e.position|default:"—" }}</td>
+                    <td>
+                        {% if e.dismissal_date %}
+                            <span class="badge-dismissed">Уволен</span>
+                        {% else %}
+                            <span class="badge-active">Работает</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <a href="{% url 'core:employee_edit' e.employee_number %}"
+                               class="btn btn-sm btn-outline-secondary" title="Редактировать">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{% url 'core:employee_delete' e.employee_number %}"
+                               class="btn btn-sm btn-outline-danger" title="Удалить">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="10" style="text-align:center;padding:48px;color:var(--text-muted)">
+                        <i class="bi bi-inbox" style="font-size:32px;display:block;margin-bottom:8px"></i>
+                        Сотрудники не найдены
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:center">
+        <nav>
+            <ul class="pagination pagination-sm mb-0">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link"
+                       href="?page={{ page_obj.previous_page_number }}&search={{ search }}&production={{ selected_production }}&workshop={{ selected_workshop }}&status={{ selected_status }}">
+                        ←
+                    </a>
+                </li>
+                {% endif %}
+                <li class="page-item active">
+                    <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                </li>
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link"
+                       href="?page={{ page_obj.next_page_number }}&search={{ search }}&production={{ selected_production }}&workshop={{ selected_workshop }}&status={{ selected_status }}">
+                        →
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
