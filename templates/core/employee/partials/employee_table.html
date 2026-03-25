@@ -24,7 +24,8 @@
             </thead>
             <tbody>
                 {% for e in page_obj %}
-                <tr>
+                <!-- Вся строка кликабельна — ведёт на карточку просмотра -->
+                <tr style="cursor:pointer" onclick="window.location='{% url 'core:employee_detail' e.employee_number %}'">
                     <td><code>{{ e.employee_number }}</code></td>
                     <td style="font-weight:500;color:var(--text-primary)">{{ e.full_name }}</td>
                     <td>{{ e.birth_date|date:"d.m.Y"|default:"—" }}</td>
@@ -40,17 +41,12 @@
                             <span class="badge-active">Работает</span>
                         {% endif %}
                     </td>
-                    <td>
-                        <div class="d-flex gap-1">
-                            <a href="{% url 'core:employee_edit' e.employee_number %}"
-                               class="btn btn-sm btn-outline-secondary" title="Редактировать">
-                                <i class="bi bi-pencil"></i>
-                            </a>
-                            <a href="{% url 'core:employee_delete' e.employee_number %}"
-                               class="btn btn-sm btn-outline-danger" title="Удалить">
-                                <i class="bi bi-trash"></i>
-                            </a>
-                        </div>
+                    <!-- Кнопка останавливает всплытие клика, чтобы не срабатывал переход по строке -->
+                    <td onclick="event.stopPropagation()">
+                        <a href="{% url 'core:employee_detail' e.employee_number %}"
+                           class="btn btn-sm btn-outline-secondary" title="Просмотр">
+                            <i class="bi bi-eye"></i>
+                        </a>
                     </td>
                 </tr>
                 {% empty %}
@@ -66,30 +62,135 @@
     </div>
 
     {% if page_obj.has_other_pages %}
-    <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:center">
-        <nav>
-            <ul class="pagination pagination-sm mb-0">
-                {% if page_obj.has_previous %}
-                <li class="page-item">
-                    <a class="page-link"
-                       href="?page={{ page_obj.previous_page_number }}&search={{ search }}&production={{ selected_production }}&workshop={{ selected_workshop }}&status={{ selected_status }}">
-                        ←
-                    </a>
-                </li>
+    <!-- Подвал пагинации: слева — инфо о диапазоне, справа — кнопки навигации -->
+    <div style="padding:12px 18px;border-top:1px solid var(--border);
+                display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+
+        <!-- Показано X–Y из Z -->
+        <span style="font-size:12px;color:var(--text-muted)">
+            Показано
+            <strong style="color:var(--text-secondary)">{{ page_obj.start_index }}–{{ page_obj.end_index }}</strong>
+            из <strong style="color:var(--text-secondary)">{{ total_count }}</strong>
+        </span>
+
+        <!-- Кнопки пагинации -->
+        <nav style="display:flex;align-items:center;gap:4px;">
+
+            <!-- В начало + предыдущая -->
+            {% if page_obj.has_previous %}
+            <a class="pg-btn" title="Первая страница"
+               href="?page=1&search={{ search }}&production={{ selected_production }}&workshop={{ selected_workshop }}&status={{ selected_status }}&per_page={{ per_page }}">
+                <i class="bi bi-chevron-double-left"></i>
+            </a>
+            <a class="pg-btn" title="Предыдущая"
+               href="?page={{ page_obj.previous_page_number }}&search={{ search }}&production={{ selected_production }}&workshop={{ selected_workshop }}&status={{ selected_status }}&per_page={{ per_page }}">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+            {% else %}
+            <span class="pg-btn pg-disabled"><i class="bi bi-chevron-double-left"></i></span>
+            <span class="pg-btn pg-disabled"><i class="bi bi-chevron-left"></i></span>
+            {% endif %}
+
+            <!-- Номера страниц: всегда первая + окно ±2 вокруг текущей + всегда последняя -->
+            <!-- Между ними многоточие, если есть разрыв -->
+            {% with cur=page_obj.number total=page_obj.paginator.num_pages %}
+
+                {% if cur > 3 %}
+                <a class="pg-btn"
+                   href="?page=1&search={{ search }}&production={{ selected_production }}&workshop={{ selected_workshop }}&status={{ selected_status }}&per_page={{ per_page }}">1</a>
                 {% endif %}
-                <li class="page-item active">
-                    <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-                </li>
-                {% if page_obj.has_next %}
-                <li class="page-item">
-                    <a class="page-link"
-                       href="?page={{ page_obj.next_page_number }}&search={{ search }}&production={{ selected_production }}&workshop={{ selected_workshop }}&status={{ selected_status }}">
-                        →
-                    </a>
-                </li>
+
+                {% if cur > 4 %}
+                <span class="pg-ellipsis">…</span>
                 {% endif %}
-            </ul>
+
+                {% for p in page_obj.paginator.page_range %}
+                    {% if p >= cur|add:"-2" and p <= cur|add:"2" %}
+                        {% if p == cur %}
+                        <span class="pg-btn pg-current">{{ p }}</span>
+                        {% else %}
+                        <a class="pg-btn"
+                           href="?page={{ p }}&search={{ search }}&production={{ selected_production }}&workshop={{ selected_workshop }}&status={{ selected_status }}&per_page={{ per_page }}">{{ p }}</a>
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+
+                {% if cur < total|add:"-3" %}
+                <span class="pg-ellipsis">…</span>
+                {% endif %}
+
+                {% if cur < total|add:"-2" %}
+                <a class="pg-btn"
+                   href="?page={{ total }}&search={{ search }}&production={{ selected_production }}&workshop={{ selected_workshop }}&status={{ selected_status }}&per_page={{ per_page }}">{{ total }}</a>
+                {% endif %}
+
+            {% endwith %}
+
+            <!-- Следующая + в конец -->
+            {% if page_obj.has_next %}
+            <a class="pg-btn" title="Следующая"
+               href="?page={{ page_obj.next_page_number }}&search={{ search }}&production={{ selected_production }}&workshop={{ selected_workshop }}&status={{ selected_status }}&per_page={{ per_page }}">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            <a class="pg-btn" title="Последняя страница"
+               href="?page={{ page_obj.paginator.num_pages }}&search={{ search }}&production={{ selected_production }}&workshop={{ selected_workshop }}&status={{ selected_status }}&per_page={{ per_page }}">
+                <i class="bi bi-chevron-double-right"></i>
+            </a>
+            {% else %}
+            <span class="pg-btn pg-disabled"><i class="bi bi-chevron-right"></i></span>
+            <span class="pg-btn pg-disabled"><i class="bi bi-chevron-double-right"></i></span>
+            {% endif %}
+
         </nav>
     </div>
     {% endif %}
 </div>
+
+<style>
+/* ─── Кнопки пагинации ─── */
+.pg-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 6px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    text-decoration: none;
+    transition: all .15s;
+    user-select: none;
+}
+.pg-btn:hover {
+    background: var(--surface-3);
+    color: var(--text-primary);
+    border-color: rgba(255,255,255,.12);
+}
+/* Активная (текущая) страница */
+.pg-btn.pg-current {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    cursor: default;
+}
+/* Недоступные кнопки (первая/последняя страница) */
+.pg-btn.pg-disabled {
+    opacity: .3;
+    cursor: default;
+    pointer-events: none;
+}
+.pg-ellipsis {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 32px;
+    font-size: 13px;
+    color: var(--text-muted);
+    user-select: none;
+}
+</style>

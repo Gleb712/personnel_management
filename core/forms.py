@@ -35,8 +35,8 @@ class FileUploadForm(forms.Form):
             raise forms.ValidationError(f"Неподдерживаемый формат. Разрешены: csv, xlsx, xls")
         
         # Проверка размера файла
-        if file.size > 10 * 1024 * 1024:
-            raise forms.ValidationError("Размер файла не должен превышать 10 МБ")
+        if file.size > 100 * 1024 * 1024:
+            raise forms.ValidationError("Размер файла не должен превышать 100 МБ")
         return file
 
 

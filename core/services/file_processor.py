@@ -333,7 +333,7 @@ class EmployeeFileProcessor:
 
         # Разбираем строки
         to_create = []  # новые — Employee объекты
-        to_update = []  # существующие — (employee_obj, data_dict)
+        to_update = []  # существующие — employee_obj, data_dict
 
         for idx, row in df.iterrows():
             data = self._parse_row(row.to_dict(), idx + 2)
@@ -351,12 +351,12 @@ class EmployeeFileProcessor:
                 # Новый сотрудник
                 to_create.append(Employee(**data))
 
-        # Создаём новых одним запросом
+        # Создаём новых сотрудников одним запросом
         if to_create:
             Employee.objects.bulk_create(to_create, batch_size=500)
             self.success_count = len(to_create)
 
-        # Обновляем существующих — мягко: пустое поле в файле = не трогаем
+        # Обновление существующих данных
         if to_update:
             updated_objects = []
             for emp, data in to_update:

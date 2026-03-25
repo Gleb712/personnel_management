@@ -4,8 +4,8 @@
 {% block nav_employees %}active{% endblock %}
 
 {% block topbar_actions %}
-<a href="{% url 'core:employee_list' %}" class="btn btn-outline-secondary btn-sm">
-    <i class="bi bi-arrow-left me-1"></i>Назад к списку
+<a href="{% url 'core:employee_detail' employee.employee_number %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Назад к карточке
 </a>
 {% endblock %}
 
@@ -23,7 +23,7 @@
             <form method="post">
                 {% csrf_token %}
 
-                <!-- Неизменяемый таб. номер -->
+                <!-- Неизменяемый табельный номер -->
                 <div class="mb-3">
                     <label class="form-label">Табельный номер</label>
                     <input type="text" class="form-control" value="{{ employee.employee_number }}" disabled>
@@ -88,7 +88,7 @@
                 {% endif %}
 
                 <div class="d-flex justify-content-end gap-2 mt-4">
-                    <a href="{% url 'core:employee_list' %}" class="btn btn-outline-secondary">
+                    <a href="{% url 'core:employee_detail' employee.employee_number %}" class="btn btn-outline-secondary">
                         Отмена
                     </a>
                     <button type="submit" class="btn btn-primary">

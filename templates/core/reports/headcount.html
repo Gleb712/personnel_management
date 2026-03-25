@@ -1,0 +1,384 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Численность по подразделениям{% endblock %}
+{% block page_title %}Отчёт: Численность по подразделениям{% endblock %}
+
+{% block topbar_actions %}
+<!-- Кнопка скачать с выпадающим списком форматов -->
+<div class="dropdown">
+    <button class="btn btn-primary btn-sm dropdown-toggle" type="button"
+            id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+        <i class="bi bi-download me-1"></i>Скачать
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="exportDropdown"
+        style="background:var(--surface-2);border:1px solid var(--border);min-width:210px">
+        <li>
+            <a class="dropdown-item export-item"
+               href="{% url 'core:report_headcount_export' %}?production={{ selected_production }}&workshop={{ selected_workshop }}">
+                <i class="bi bi-file-earmark-excel me-2" style="color:#22c55e"></i>
+                Таблица Excel (.xlsx)
+            </a>
+        </li>
+        <li><hr class="dropdown-divider" style="border-color:var(--border);margin:4px 0"></li>
+        <li>
+            <span style="font-size:10px;color:var(--text-muted);padding:4px 16px;
+                         text-transform:uppercase;letter-spacing:.06em;display:block">
+                Графики (PNG)
+            </span>
+        </li>
+        <li>
+            <a class="dropdown-item export-item" href="#"
+               onclick="downloadChart('chartStatus','статус');return false">
+                <i class="bi bi-pie-chart me-2" style="color:var(--accent)"></i>
+                Статус сотрудников
+            </a>
+        </li>
+        <li>
+            <a class="dropdown-item export-item" href="#"
+               onclick="downloadChart('chartProduction','производства');return false">
+                <i class="bi bi-bar-chart me-2" style="color:var(--accent)"></i>
+                По производствам
+            </a>
+        </li>
+        <li>
+            <a class="dropdown-item export-item" href="#"
+               onclick="downloadChart('chartPosition','должности');return false">
+                <i class="bi bi-bar-chart me-2" style="color:var(--accent)"></i>
+                По должностям
+            </a>
+        </li>
+        <li>
+            <a class="dropdown-item export-item" href="#"
+               onclick="downloadChart('chartCategory','категории');return false">
+                <i class="bi bi-pie-chart me-2" style="color:var(--accent)"></i>
+                По категориям
+            </a>
+        </li>
+    </ul>
+</div>
+{% endblock %}
+
+{% block extra_head %}{% endblock %}
+
+{% block content %}
+
+<!-- Данные для Chart.js передаём из Django как JSON-тег -->
+{{ charts_json|json_script:"chartsData" }}
+
+<!-- Фильтры -->
+<div class="card mb-4">
+    <div class="card-body" style="padding:14px 18px">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Производство</label>
+                <select class="form-select form-select-sm" name="production" onchange="this.form.submit()">
+                    <option value="">Все производства</option>
+                    {% for p in productions %}
+                    <option value="{{ p.id }}" {% if selected_production == p.id|stringformat:"s" %}selected{% endif %}>
+                        {{ p.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Цех</label>
+                <select class="form-select form-select-sm" name="workshop" onchange="this.form.submit()">
+                    <option value="">Все цеха</option>
+                    {% for w in workshops %}
+                    <option value="{{ w.id }}" {% if selected_workshop == w.id|stringformat:"s" %}selected{% endif %}>
+                        Цех {{ w.number }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <a href="{% url 'core:report_headcount' %}" class="btn btn-outline-secondary btn-sm w-100">
+                    <i class="bi bi-x me-1"></i>Сбросить
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Итоговые карточки -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-num">{{ data.total }}</div>
+            <div class="stat-lbl">Всего записей</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-num" style="color:#4ade80">{{ data.total_active }}</div>
+            <div class="stat-lbl">Работают</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-num" style="color:#f87171">{{ data.total_dismissed }}</div>
+            <div class="stat-lbl">Уволены</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            {% if data.total %}
+            <div class="stat-num" style="color:var(--accent)">
+                {% widthratio data.total_active data.total 100 %}<span style="font-size:16px;font-weight:400;color:var(--text-muted)">%</span>
+            </div>
+            {% else %}
+            <div class="stat-num" style="color:var(--accent)">—</div>
+            {% endif %}
+            <div class="stat-lbl">Доля работающих</div>
+        </div>
+    </div>
+</div>
+
+<!-- Графики -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-pie-chart" style="color:var(--accent)"></i>
+                Статус сотрудников
+            </div>
+            <div class="card-body d-flex align-items-center justify-content-center" style="padding:16px">
+                <canvas id="chartStatus" style="max-height:220px"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-bar-chart" style="color:var(--accent)"></i>
+                По производствам
+            </div>
+            <div class="card-body" style="padding:16px">
+                <canvas id="chartProduction" style="max-height:220px"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-pie-chart" style="color:var(--accent)"></i>
+                По категориям
+            </div>
+            <div class="card-body d-flex align-items-center justify-content-center" style="padding:16px">
+                <canvas id="chartCategory" style="max-height:220px"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-bar-chart-horizontal" style="color:var(--accent)"></i>
+        По должностям (топ 10)
+    </div>
+    <div class="card-body" style="padding:16px">
+        <canvas id="chartPosition" style="max-height:260px"></canvas>
+    </div>
+</div>
+
+<!-- Таблицы -->
+<div style="display:flex;gap:4px;margin-bottom:-1px;position:relative;z-index:1;flex-wrap:wrap">
+    <button class="tab-btn tab-active" onclick="switchTab('production',this)">По производствам</button>
+    <button class="tab-btn" onclick="switchTab('workshop',this)">По цехам</button>
+    <button class="tab-btn" onclick="switchTab('position',this)">По должностям</button>
+    <button class="tab-btn" onclick="switchTab('category',this)">По категориям</button>
+</div>
+
+<div id="tab-production" class="tab-panel">
+    <div class="card" style="border-radius:0 10px 10px 10px">
+        {% include 'core/reports/partials/headcount_table.html' with rows=data.by_production col_label='Производство' show_extra=False %}
+    </div>
+</div>
+<div id="tab-workshop" class="tab-panel" style="display:none">
+    <div class="card" style="border-radius:0 10px 10px 10px">
+        {% include 'core/reports/partials/headcount_table.html' with rows=data.by_workshop col_label='Цех' show_extra=True %}
+    </div>
+</div>
+<div id="tab-position" class="tab-panel" style="display:none">
+    <div class="card" style="border-radius:0 10px 10px 10px">
+        {% include 'core/reports/partials/headcount_table.html' with rows=data.by_position col_label='Должность' show_extra=False %}
+    </div>
+</div>
+<div id="tab-category" class="tab-panel" style="display:none">
+    <div class="card" style="border-radius:0 10px 10px 10px">
+        {% include 'core/reports/partials/headcount_table.html' with rows=data.by_category col_label='Категория' show_extra=False %}
+    </div>
+</div>
+
+<style>
+/* Вкладки срезов */
+.tab-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    background: var(--surface-2);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all .15s;
+}
+.tab-btn:hover    { background: var(--surface-3); color: var(--text-primary); }
+.tab-btn.tab-active { background: var(--surface); color: var(--text-primary); }
+
+/* Строки выпадашки */
+.dropdown-item.export-item {
+    color: var(--text-secondary);
+    font-size: 13px;
+    padding: 7px 16px;
+    display: flex;
+    align-items: center;
+    transition: background .15s;
+    cursor: pointer;
+}
+.dropdown-item.export-item:hover { background: var(--surface-3); color: var(--text-primary); }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'vendors/chartjs-4.4.1/chart.umd.min.js' %}"></script>
+<script>
+// Данные из Django
+const charts = JSON.parse(document.getElementById('chartsData').textContent);
+
+// Глобальные настройки Chart.js под тему проекта
+Chart.defaults.color       = '#8899aa';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+Chart.defaults.font.family = 'Inter, sans-serif';
+Chart.defaults.font.size   = 12;
+Chart.defaults.plugins.legend.labels.boxWidth = 12;
+
+const C = {
+    green:   '#4ade80',
+    red:     '#f87171',
+    palette: ['#3b82f6','#8b5cf6','#f59e0b','#22c55e','#ef4444',
+              '#06b6d4','#f97316','#a855f7','#14b8a6','#e11d48'],
+};
+
+// Пончик: статус 
+new Chart(document.getElementById('chartStatus'), {
+    type: 'doughnut',
+    data: {
+        labels: charts.status.labels,
+        datasets: [{ data: charts.status.values, backgroundColor: [C.green, C.red], borderWidth: 0, hoverOffset: 6 }]
+    },
+    options: {
+        cutout: '65%',
+        plugins: {
+            legend: { position: 'bottom' },
+            tooltip: { callbacks: {
+                label: ctx => {
+                    const total = charts.status.values.reduce((a,b)=>a+b,0);
+                    return ` ${ctx.label}: ${ctx.parsed} (${Math.round(ctx.parsed/total*100)}%)`;
+                }
+            }}
+        }
+    }
+});
+
+// Стэкированный бар: по производствам
+new Chart(document.getElementById('chartProduction'), {
+    type: 'bar',
+    data: {
+        labels: charts.production.labels,
+        datasets: [
+            { label: 'Работают', data: charts.production.active,    backgroundColor: C.green },
+            { label: 'Уволены',  data: charts.production.dismissed, backgroundColor: C.red   },
+        ]
+    },
+    options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: { legend: { position: 'top' } },
+        scales: {
+            x: { stacked: true, grid: { color: 'rgba(255,255,255,0.04)' } },
+            y: { stacked: true, grid: { display: false } },
+        }
+    }
+});
+
+// Стэкированный бар: по должностям
+new Chart(document.getElementById('chartPosition'), {
+    type: 'bar',
+    data: {
+        labels: charts.position.labels,
+        datasets: [
+            { label: 'Работают', data: charts.position.active,    backgroundColor: C.green },
+            { label: 'Уволены',  data: charts.position.dismissed, backgroundColor: C.red   },
+        ]
+    },
+    options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: { legend: { position: 'top' } },
+        scales: {
+            x: { stacked: true, grid: { color: 'rgba(255,255,255,0.04)' } },
+            y: { stacked: true, grid: { display: false } },
+        }
+    }
+});
+
+// Пончик: по категориям
+new Chart(document.getElementById('chartCategory'), {
+    type: 'doughnut',
+    data: {
+        labels: charts.category.labels,
+        datasets: [{ data: charts.category.values, backgroundColor: C.palette, borderWidth: 0, hoverOffset: 6 }]
+    },
+    options: {
+        cutout: '60%',
+        plugins: { legend: { position: 'bottom' } },
+    }
+});
+
+// Итоговые строки таблиц — считаем суммы через JS
+document.querySelectorAll('.report-table').forEach(table => {
+    let sumActive = 0, sumDismissed = 0, sumTotal = 0;
+    table.querySelectorAll('tbody tr').forEach(tr => {
+        const a = tr.querySelector('[data-active]');
+        const d = tr.querySelector('[data-dismissed]');
+        const t = tr.querySelector('[data-total]');
+        if (a) sumActive    += parseInt(a.textContent.trim()) || 0;
+        if (d) sumDismissed += parseInt(d.textContent.trim()) || 0;
+        if (t) sumTotal     += parseInt(t.textContent.trim()) || 0;
+    });
+    const fa = table.querySelector('.foot-active');
+    const fd = table.querySelector('.foot-dismissed');
+    const ft = table.querySelector('.foot-total');
+    if (fa) fa.textContent = sumActive;
+    if (fd) fd.textContent = sumDismissed;
+    if (ft) ft.textContent = sumTotal;
+});
+
+// Переключение вкладок
+function switchTab(id, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+    document.getElementById('tab-' + id).style.display = 'block';
+    btn.classList.add('tab-active');
+}
+
+//  Скачать график как PNG
+function downloadChart(canvasId, name) {
+    const src = document.getElementById(canvasId);
+    const off = document.createElement('canvas');
+    off.width  = src.width;
+    off.height = src.height;
+    const ctx  = off.getContext('2d');
+    ctx.fillRect(0, 0, off.width, off.height);
+    ctx.drawImage(src, 0, 0);
+    const link = document.createElement('a');
+    link.download = `отчёт_${name}.png`;
+    link.href = off.toDataURL('image/png');
+    link.click();
+}
+</script>
+
+{% endblock %}

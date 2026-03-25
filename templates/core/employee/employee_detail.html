@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% block title %}{{ employee.full_name }}{% endblock %}
+{% block page_title %}Карточка сотрудника{% endblock %}
+{% block nav_employees %}active{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'core:employee_list' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>К списку сотрудников
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-xl-7 col-lg-9">
+
+    <!-- Шапка карточки: имя + статус -->
+    <div class="card mb-3">
+        <div class="card-body" style="padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+            <div>
+                <div style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:4px">
+                    {{ employee.full_name }}
+                </div>
+                <div style="font-size:13px;color:var(--text-muted)">
+                    Табельный номер: <code>{{ employee.employee_number }}</code>
+                </div>
+            </div>
+            <div>
+                {% if employee.dismissal_date %}
+                    <span class="badge-dismissed" style="font-size:13px;padding:5px 14px">Уволен</span>
+                {% else %}
+                    <span class="badge-active" style="font-size:13px;padding:5px 14px">Работает</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Основные данные -->
+    <div class="card mb-3">
+        <div class="card-header">
+            <i class="bi bi-person" style="color:var(--accent)"></i>
+            Личные данные
+        </div>
+        <div class="card-body" style="padding:0">
+
+            <div class="detail-row">
+                <span class="detail-label">Дата рождения</span>
+                <span class="detail-value">{{ employee.birth_date|date:"d.m.Y"|default:"—" }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Дата приёма на работу</span>
+                <span class="detail-value">{{ employee.hire_date|date:"d.m.Y" }}</span>
+            </div>
+
+            <!-- Блок увольнения — показываем только если уволен -->
+            {% if employee.dismissal_date %}
+            <div class="detail-row">
+                <span class="detail-label">Дата увольнения</span>
+                <span class="detail-value" style="color:#f87171">{{ employee.dismissal_date|date:"d.m.Y" }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Причина увольнения</span>
+                <span class="detail-value">{{ employee.dismissal_reason|default:"—" }}</span>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+
+    <!-- Место работы -->
+    <div class="card mb-3">
+        <div class="card-header">
+            <i class="bi bi-building" style="color:var(--accent)"></i>
+            Место работы
+        </div>
+        <div class="card-body" style="padding:0">
+
+            <div class="detail-row">
+                <span class="detail-label">Производство</span>
+                <span class="detail-value">{{ employee.production|default:"—" }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Цех</span>
+                <span class="detail-value">{{ employee.workshop|default:"—" }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Должность</span>
+                <span class="detail-value">{{ employee.position|default:"—" }}</span>
+            </div>
+            <div class="detail-row" style="border-bottom:none">
+                <span class="detail-label">Категория работника</span>
+                <span class="detail-value">{{ employee.employee_category|default:"—" }}</span>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Кнопки действий внизу -->
+    <div class="d-flex justify-content-between align-items-center">
+        <a href="{% url 'core:employee_delete' employee.employee_number %}"
+           class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-trash me-1"></i>Удалить сотрудника
+        </a>
+        <a href="{% url 'core:employee_edit' employee.employee_number %}"
+           class="btn btn-primary btn-sm">
+            <i class="bi bi-pencil me-1"></i>Редактировать
+        </a>
+    </div>
+
+</div>
+</div>
+
+<style>
+/* ─── Строки деталей карточки ─── */
+.detail-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+}
+.detail-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    flex-shrink: 0;
+    min-width: 180px;
+}
+.detail-value {
+    font-size: 14px;
+    color: var(--text-primary);
+    text-align: right;
+}
+</style>
+{% endblock %}

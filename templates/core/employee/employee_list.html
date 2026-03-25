@@ -11,7 +11,7 @@
 
 {% block content %}
 
-<!-- Статы -->
+<!-- Общая статистика -->
 <div class="row g-3 mb-4">
     <div class="col-6 col-md-3">
         <div class="stat-card">
@@ -58,19 +58,19 @@
                 </select>
             </div>
 
-            <div class="col-md-2">
+            <div class="col-md-1">
                 <label class="form-label">Цех</label>
                 <select class="form-select form-select-sm auto-filter" name="workshop">
                     <option value="">Все</option>
                     {% for w in workshops %}
                     <option value="{{ w.id }}" {% if selected_workshop == w.id|stringformat:"s" %}selected{% endif %}>
-                        Цех {{ w.number }}
+                        {{ w.number }}
                     </option>
                     {% endfor %}
                 </select>
             </div>
 
-            <div class="col-md-2">
+            <div class="col-md-1">
                 <label class="form-label">Статус</label>
                 <select class="form-select form-select-sm auto-filter" name="status">
                     <option value="">Все</option>
@@ -79,7 +79,17 @@
                 </select>
             </div>
 
-            <div class="col-md-2">
+            <!-- Выбор количества строк на странице -->
+            <div class="col-md-1">
+                <label class="form-label">Строк</label>
+                <select class="form-select form-select-sm auto-filter" name="per_page">
+                    {% for opt in per_page_options %}
+                    <option value="{{ opt }}" {% if per_page == opt %}selected{% endif %}>{{ opt }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-3">
                 <a href="{% url 'core:employee_list' %}" class="btn btn-outline-secondary btn-sm w-100">
                     <i class="bi bi-x me-1"></i>Сбросить
                 </a>
