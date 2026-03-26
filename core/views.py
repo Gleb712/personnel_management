@@ -49,13 +49,28 @@ def access_denied(request):
  
  
 def _redirect_by_role(user):
-    """Возвращает редирект в зависимости от роли пользователя"""
+    """
+    Редирект после авторизации в зависимости от роли:
+      Суперпользователь        → core:report_headcount
+      Администратор            → core:report_headcount
+      Директор по персоналу   → core:report_headcount
+      Редактор                 → core:upload_file
+      Просмотр                 → core:report_headcount
+      Без группы               → core:report_headcount
+    """
     if user.is_superuser:
+        return redirect('core:report_headcount')
+ 
+    group_names = set(user.groups.values_list('name', flat=True))
+ 
+    if 'Администратор' in group_names:
+        return redirect('core:report_headcount')
+ 
+    if 'Редактор' in group_names:
         return redirect('core:upload_file')
-    profile = getattr(user, 'profile', None)
-    if profile:
-        return redirect(profile.login_redirect_url)
-    return redirect('core:upload_file')
+ 
+    # Директор по персоналу, Просмотр, без группы — на отчёты
+    return redirect('core:report_headcount')
 
 
 # Основные view

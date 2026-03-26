@@ -10,13 +10,18 @@ from core.models import (
 
 class EmployeeFileProcessor:
     """
-    
-    Класс для обработки файлов с данными о сотрудниках
-    С оптимизацией для быстрой загрузки больших файлов
-    
-    Логика: новые записи - добавление, существующие - строгое обновление
-    Сейчас реализовано строгое обновление - пустое поле в файле записывает пустое значение поверх существующего в БД
-    Также реализовано мягкое обновление - пустое поле в файле не затирает существующее значение в БД (оно закоментировано, но помечено для быстрой замены)
+    Класс для обработки файлов с данными о сотрудниках.
+    С оптимизацией для быстрой загрузки больших файлов.
+
+    Логика: новые записи — добавление, существующие — обновление.
+
+    Два режима обновления (переключается в _parse_row и process):
+    - СТРОГОЕ обновление (активно): пустое поле в файле ЗАПИСЫВАЕТ None поверх
+      существующего значения в БД. Нужно когда: работник заново устроился,
+      дата увольнения должна стереться из БД.
+    - МЯГКОЕ обновление (закомментировано): пустое поле в файле НЕ затирает
+      существующее значение в БД. Нужно когда: в выгрузке забыли указать
+      дату увольнения, но она уже есть в БД — трогать не нужно.
     """
 
     COLUMN_MAPPING = {
@@ -42,7 +47,7 @@ class EmployeeFileProcessor:
     def __init__(self, file):
         """
         Инициализация обработчика файлов
-        
+
         Args:
             file: Загруженный файл
         """
@@ -64,7 +69,7 @@ class EmployeeFileProcessor:
     def read_file(self):
         """
         Чтение файлов Excel и CSV
-        
+
         Returns:
             pandas.DataFrame: Таблица с данными
         """
@@ -95,7 +100,7 @@ class EmployeeFileProcessor:
                         continue
                 if df is None:
                     raise ValidationError(f"Не удалось прочитать файл. Ошибка: {last_error}")
-                
+
             # Проверка для Excel
             elif file_extension in ['xlsx', 'xls']:
                 self.file.seek(0)
@@ -151,7 +156,7 @@ class EmployeeFileProcessor:
             field: Название поля для поиска. По умолчанию 'name'
 
         Returns:
-            
+            Объект модели или None
         """
         if not value:
             return None
@@ -210,22 +215,13 @@ class EmployeeFileProcessor:
             'hire_date': hire_date,
         }
 
-        # Для мягкого обновления
-        # Необязательные даты (пропускаем или пусто)
-        """
+        # ── НЕОБЯЗАТЕЛЬНЫЕ ДАТЫ ────────────────────────────────────────────────
+        #
+        # СТРОГОЕ обновление (активно):
+        # Пустая ячейка в файле записывает None в БД.
+        # Нужно: работник заново устроился — дата увольнения стирается.
         for col, field in [('дата рождения', 'birth_date'), ('дата увольнения', 'dismissal_date')]:
-            raw = get(col)
-            if raw:
-                try:
-                    data[field] = self.parse_date(raw)
-                except ValueError as e:
-                    self.errors.append(f"Строка {row_num}: {e}")
-        """
-
-        # Для строгого обновления
-        # Всегда пишем в data, даже None
-        for col, field in [('дата рождения', 'birth_date'), ('дата увольнения', 'dismissal_date')]:
-            if col in keys:  # есть ли колонка в файле
+            if col in keys:  # колонка присутствует в файле
                 raw = get(col)
                 if raw:
                     try:
@@ -234,33 +230,23 @@ class EmployeeFileProcessor:
                         self.errors.append(f"Строка {row_num}: {e}")
                         data[field] = None  # ошибка парсинга = нет данных
                 else:
-                    data[field] = None  # пустая ячейка = None
+                    data[field] = None  # пустая ячейка → None
 
-        # Для мягкого обновления
-        # Только если значение есть в файле
-        """
-        production_val = get('производство')
-        if production_val:
-            data['production'] = self._get_or_create(self._production_cache, Production, production_val)
+        # МЯГКОЕ обновление (закомментировано):
+        # Пустая ячейка в файле НЕ затирает существующее значение в БД.
+        # Нужно: в выгрузке забыли указать дату увольнения — не трогаем БД.
+        # for col, field in [('дата рождения', 'birth_date'), ('дата увольнения', 'dismissal_date')]:
+        #     raw = get(col)
+        #     if raw:
+        #         try:
+        #             data[field] = self.parse_date(raw)
+        #         except ValueError as e:
+        #             self.errors.append(f"Строка {row_num}: {e}")
 
-        workshop_val = get('цех')
-        if workshop_val:
-            data['workshop'] = self._get_or_create(self._workshop_cache, Workshop, workshop_val, field='number')
-
-        dismissal_val = get('причина увольнения')
-        if dismissal_val:
-            data['dismissal_reason'] = self._get_or_create(self._dismissal_reason_cache, DismissalReason, dismissal_val)
-
-        category_val = get('категория рабочего')
-        if category_val:
-            data['employee_category'] = self._get_or_create( self._category_cache, EmployeeCategory, category_val)
-
-        position_val = get('должность')
-        if position_val:
-            data['position'] = self._get_or_create(self._position_cache, Position, position_val)
-        """
-
-        # Для строгого обновления
+        # ── НЕОБЯЗАТЕЛЬНЫЕ СПРАВОЧНИКИ ─────────────────────────────────────────
+        #
+        # СТРОГОЕ обновление (активно):
+        # Пустая ячейка в файле записывает None (связь с справочником обнуляется).
         if 'производство' in keys:
             production_val = get('производство')
             data['production'] = self._get_or_create(
@@ -291,6 +277,28 @@ class EmployeeFileProcessor:
                 self._position_cache, Position, position_val
             ) if position_val else None
 
+        # МЯГКОЕ обновление (закомментировано):
+        # Обновляем только если значение пришло из файла (не пустое).
+        # production_val = get('производство')
+        # if production_val:
+        #     data['production'] = self._get_or_create(self._production_cache, Production, production_val)
+        #
+        # workshop_val = get('цех')
+        # if workshop_val:
+        #     data['workshop'] = self._get_or_create(self._workshop_cache, Workshop, workshop_val, field='number')
+        #
+        # dismissal_val = get('причина увольнения')
+        # if dismissal_val:
+        #     data['dismissal_reason'] = self._get_or_create(self._dismissal_reason_cache, DismissalReason, dismissal_val)
+        #
+        # category_val = get('категория рабочего')
+        # if category_val:
+        #     data['employee_category'] = self._get_or_create(self._category_cache, EmployeeCategory, category_val)
+        #
+        # position_val = get('должность')
+        # if position_val:
+        #     data['position'] = self._get_or_create(self._position_cache, Position, position_val)
+
         return data
 
     # ========== Основной метод ==========
@@ -299,7 +307,7 @@ class EmployeeFileProcessor:
     def process(self):
         """
         Основной метод обработки файла с оптимизацией
-        
+
         Returns:
             dict: Статистика обработки
         """
@@ -333,7 +341,7 @@ class EmployeeFileProcessor:
 
         # Разбираем строки
         to_create = []  # новые — Employee объекты
-        to_update = []  # существующие — employee_obj, data_dict
+        to_update = []  # существующие — (employee_obj, data_dict)
 
         for idx, row in df.iterrows():
             data = self._parse_row(row.to_dict(), idx + 2)
@@ -344,8 +352,6 @@ class EmployeeFileProcessor:
             emp_number = data['employee_number']
 
             if emp_number in existing_employees:
-                # Существующий — мягкое обновление:
-                # обновляем только те поля, которые не пустые в файле
                 to_update.append((existing_employees[emp_number], data))
             else:
                 # Новый сотрудник
@@ -361,23 +367,26 @@ class EmployeeFileProcessor:
             updated_objects = []
             for emp, data in to_update:
                 changed = False
-                # Мягкое обновление данных - если данные в загруженном файле и БД расходятся - приоритет у БД
-                # Когда нужно: забыли указать дату увольнения в выгрузке
-                """
-                for field in self.UPDATE_FIELDS:
-                    if field in data and data[field] is not None:
-                        # Обновляем только если значение пришло из файла
-                        setattr(emp, field, data[field])
-                        changed = True
-                """
-                # Строгое обновление данных - если данные в загруженном файле и БД расходятся - приоритет у загруженного файла
-                # Когда нужно: работник заново устроился, дата увольнения стирается из БД
+
+                # СТРОГОЕ обновление (активно):
+                # Если значение в файле и БД расходятся — приоритет у файла.
+                # None из файла тоже записывается (стирает старое значение).
+                # Нужно: работник заново устроился — дата увольнения стирается из БД.
                 for field in self.UPDATE_FIELDS:
                     if field in data:
                         new_val = data[field]  # может быть None
                         if getattr(emp, field) != new_val:
                             setattr(emp, field, new_val)
                             changed = True
+
+                # МЯГКОЕ обновление (закомментировано):
+                # Обновляем только поля, которые явно пришли из файла (не None).
+                # Нужно: в выгрузке нет даты увольнения — существующая в БД сохраняется.
+                # for field in self.UPDATE_FIELDS:
+                #     if field in data and data[field] is not None:
+                #         setattr(emp, field, data[field])
+                #         changed = True
+
                 if changed:
                     updated_objects.append(emp)
 

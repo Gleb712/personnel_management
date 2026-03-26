@@ -4,9 +4,8 @@
 /.env
 /create_table.py
 /main.py
-/test1k.csv
-/test1k.xlsx
-/test1m.xlsx
+*.csv
+*.xlsx
 /wheels
 /static/vendors
 __pycache__/
