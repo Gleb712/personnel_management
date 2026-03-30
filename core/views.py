@@ -15,8 +15,10 @@ from openpyxl.utils import get_column_letter
 from .forms import FileUploadForm, EmployeeEditForm
 from .permissions import can_upload, can_edit, can_view
 from core.services.file_processor import EmployeeFileProcessor
-from core.services.report_service import get_headcount_report
+from core.services.report_service import get_movement_report
 from .models import Employee, Production, Workshop
+
+from core.permissions import login_required_custom
 
 def login_view(request):
     """Страница входа. После успешной авторизации редиректит по роли."""
@@ -51,20 +53,20 @@ def access_denied(request):
 def _redirect_by_role(user):
     """
     Редирект после авторизации в зависимости от роли:
-      Суперпользователь        → core:report_headcount
-      Администратор            → core:report_headcount
+      Суперпользователь        → core:upload_file
+      Администратор            → core:upload_file
       Директор по персоналу   → core:report_headcount
       Редактор                 → core:upload_file
       Просмотр                 → core:report_headcount
       Без группы               → core:report_headcount
     """
     if user.is_superuser:
-        return redirect('core:report_headcount')
+        return redirect('core:upload_file')
  
     group_names = set(user.groups.values_list('name', flat=True))
  
     if 'Администратор' in group_names:
-        return redirect('core:report_headcount')
+        return redirect('core:upload_file')
  
     if 'Редактор' in group_names:
         return redirect('core:upload_file')
@@ -276,48 +278,19 @@ def employee_delete(request, employee_number):
 
 @can_view
 def report_headcount(request):
-    """
-    Отчёт «Численность по подразделениям»
-    Поддерживает фильтрацию по производству и цеху
-    """
+    """Отчёт «Численность» — срез на текущий момент."""
+    from core.services.report_service import get_headcount_report
+
     production_id = request.GET.get('production', '')
     workshop_id   = request.GET.get('workshop', '')
 
-    # Приводим к int или None — сервис ожидает int|None
     prod_id = int(production_id) if production_id else None
     ws_id   = int(workshop_id)   if workshop_id   else None
 
     data = get_headcount_report(production_id=prod_id, workshop_id=ws_id)
 
-    # Данные для Chart.js — сериализуем здесь, чтобы шаблон оставался чистым
-    charts = {
-        # Пончик: активные vs уволенные
-        'status': {
-            'labels': ['Работают', 'Уволены'],
-            'values': [data['total_active'], data['total_dismissed']],
-        },
-        # Горизонтальный стэкированный бар: топ-10 производств
-        'production': {
-            'labels':    [p.name for p in data['by_production'][:10]],
-            'active':    [p.active    for p in data['by_production'][:10]],
-            'dismissed': [p.dismissed for p in data['by_production'][:10]],
-        },
-        # Горизонтальный стэкированный бар: топ-10 должностей
-        'position': {
-            'labels':    [p.name for p in data['by_position'][:10]],
-            'active':    [p.active    for p in data['by_position'][:10]],
-            'dismissed': [p.dismissed for p in data['by_position'][:10]],
-        },
-        # Пончик: по категориям работников
-        'category': {
-            'labels': [c.name  for c in data['by_category']],
-            'values': [c.total for c in data['by_category']],
-        },
-    }
-
     return render(request, 'core/reports/headcount.html', {
         'data':                data,
-        'charts_json':         json.dumps(charts, ensure_ascii=False),
         'productions':         Production.objects.all(),
         'workshops':           Workshop.objects.all(),
         'selected_production': production_id,
@@ -327,10 +300,9 @@ def report_headcount(request):
 
 @can_view
 def report_headcount_export(request):
-    """
-    Экспорт отчёта «Численность по подразделениям» в Excel
-    Создаёт многолистовую книгу: по одному листу на каждый срез данных
-    """
+    """Экспорт отчёта «Численность» в Excel — без стилей, только данные."""
+    from core.services.report_service import get_headcount_report
+
     production_id = request.GET.get('production', '')
     workshop_id   = request.GET.get('workshop', '')
     prod_id = int(production_id) if production_id else None
@@ -339,114 +311,165 @@ def report_headcount_export(request):
     data = get_headcount_report(production_id=prod_id, workshop_id=ws_id)
 
     wb = openpyxl.Workbook()
-    wb.remove(wb.active)  # Убираем дефолтный пустой лист
+    ws = wb.active
+    ws.title = 'Численность'
 
-    # Стили 
-    header_font    = Font(bold=True, color='FFFFFF', size=11, name='Arial')
-    data_font      = Font(size=11, name='Arial')
-    bold_font      = Font(bold=True, size=11, name='Arial')
-    header_fill    = PatternFill('solid', start_color='1E2535')
-    title_fill     = PatternFill('solid', start_color='3B82F6')
-    footer_fill    = PatternFill('solid', start_color='252D3D')
-    alt_fill       = PatternFill('solid', start_color='1A2030')
-    center         = Alignment(horizontal='center', vertical='center')
-    left           = Alignment(horizontal='left',   vertical='center')
-    thin           = Side(style='thin', color='2D3748')
-    border         = Border(bottom=thin, right=thin, left=thin, top=thin)
+    # Заголовок
+    ws.append(['Производство', 'Цех', 'Всего', 'РСС', 'Рабочие'])
 
-    def add_sheet(title, headers, rows_data):
-        """Создаёт лист с заголовком, шапкой, данными и строкой итогов"""
-        ws = wb.create_sheet(title=title)
+    for prod in data['by_production']:
+        for workshop in prod['workshops']:
+            ws.append([
+                prod['name'],
+                f"Цех {workshop.number}",
+                workshop.total,
+                workshop.rss,
+                workshop.workers,
+            ])
+        # Промежуточный итог по производству
+        ws.append([
+            f"Итого {prod['name']}", '',
+            prod['total'], prod['rss'], prod['workers'],
+        ])
 
-        # Заголовок листа (строка 1, объединённые ячейки)
-        last_col = get_column_letter(len(headers))
-        ws.merge_cells(f'A1:{last_col}1')
-        ws['A1'] = title
-        ws['A1'].font      = Font(bold=True, size=14, color='FFFFFF', name='Arial')
-        ws['A1'].fill      = title_fill
-        ws['A1'].alignment = center
-        ws.row_dimensions[1].height = 30
+    # Общий итог
+    ws.append(['ИТОГО', '', data['grand_total'], data['grand_rss'], data['grand_workers']])
 
-        # Шапка таблицы (строка 2)
-        for col, h in enumerate(headers, start=1):
-            cell            = ws.cell(row=2, column=col, value=h)
-            cell.font       = header_font
-            cell.fill       = header_fill
-            cell.alignment  = center
-            cell.border     = border
-        ws.row_dimensions[2].height = 22
-
-        # Данные (строки 3+)
-        for r_idx, row in enumerate(rows_data, start=3):
-            for c_idx, val in enumerate(row, start=1):
-                cell           = ws.cell(row=r_idx, column=c_idx, value=val)
-                cell.font      = data_font
-                cell.alignment = left if c_idx == 1 else center
-                cell.border    = border
-                # Чередование фона строк для читабельности
-                if r_idx % 2 == 0:
-                    cell.fill = alt_fill
-
-        last_data_row = 2 + len(rows_data)
-
-        # Строка итогов (формулы Excel)
-        foot_row = last_data_row + 1
-        ws.cell(row=foot_row, column=1, value='Итого').font = bold_font
-        ws.cell(row=foot_row, column=1).fill      = footer_fill
-        ws.cell(row=foot_row, column=1).alignment = left
-        ws.cell(row=foot_row, column=1).border    = border
-        for col in range(2, len(headers) + 1):
-            cl   = get_column_letter(col)
-            cell = ws.cell(row=foot_row, column=col,
-                           value=f'=SUM({cl}3:{cl}{last_data_row})')
-            cell.font      = bold_font
-            cell.fill      = footer_fill
-            cell.alignment = center
-            cell.border    = border
-
-        # Ширина колонок
-        ws.column_dimensions['A'].width = 38
-        for col in range(2, len(headers) + 1):
-            ws.column_dimensions[get_column_letter(col)].width = 15
-
-        return ws
-
-    # Лист 1: по производствам
-    add_sheet(
-        'По производствам',
-        ['Производство', 'Работают', 'Уволены', 'Всего'],
-        [(p.name, p.active, p.dismissed, p.total) for p in data['by_production']],
-    )
-
-    # Лист 2: по цехам
-    add_sheet(
-        'По цехам',
-        ['Цех', 'Производство', 'Работают', 'Уволены', 'Всего'],
-        [
-            (f'Цех {w.number}', w.production.name if w.production else '—',
-             w.active, w.dismissed, w.total)
-            for w in data['by_workshop']
-        ],
-    )
-
-    # Лист 3: по должностям
-    add_sheet(
-        'По должностям',
-        ['Должность', 'Работают', 'Уволены', 'Всего'],
-        [(p.name, p.active, p.dismissed, p.total) for p in data['by_position']],
-    )
-
-    # Лист 4: по категориям работников
-    add_sheet(
-        'По категориям',
-        ['Категория работника', 'Работают', 'Уволены', 'Всего'],
-        [(c.name, c.active, c.dismissed, c.total) for c in data['by_category']],
-    )
-
-    # Отдаём файл как вложение
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-    response['Content-Disposition'] = 'attachment; filename="headcount_report.xlsx"'
+    response['Content-Disposition'] = 'attachment; filename="headcount.xlsx"'
     wb.save(response)
     return response
+
+
+@can_view
+def report_movement(request):
+    """Отчёт «Движение персонала» — динамика за год."""
+    from core.services.report_service import get_movement_report
+    from datetime import date as _date
+
+    production_id = request.GET.get('production', '')
+    workshop_id   = request.GET.get('workshop', '')
+    year_param    = request.GET.get('year', '')
+
+    prod_id = int(production_id) if production_id else None
+    ws_id   = int(workshop_id)   if workshop_id   else None
+    year    = int(year_param)    if year_param    else _date.today().year
+
+    data = get_movement_report(production_id=prod_id, workshop_id=ws_id, year=year)
+
+    return render(request, 'core/reports/movement.html', {
+        'data':                data,
+        'productions':         Production.objects.all(),
+        'workshops':           Workshop.objects.all(),
+        'selected_production': production_id,
+        'selected_workshop':   workshop_id,
+        'selected_year':       str(year),
+    })
+
+
+@can_view
+def report_movement_export(request):
+    """Экспорт отчёта «Движение персонала» в Excel — без стилей, только данные."""
+    from core.services.report_service import get_movement_report
+    from datetime import date as _date
+
+    production_id = request.GET.get('production', '')
+    workshop_id   = request.GET.get('workshop', '')
+    year_param    = request.GET.get('year', '')
+    prod_id = int(production_id) if production_id else None
+    ws_id   = int(workshop_id)   if workshop_id   else None
+    year    = int(year_param)    if year_param    else _date.today().year
+
+    data = get_movement_report(production_id=prod_id, workshop_id=ws_id, year=year)
+
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)
+
+    # Лист 1: помесячная динамика
+    ws1 = wb.create_sheet('Динамика по месяцам')
+    ws1.append(['Месяц', 'Принято', 'Уволено', 'Разница', 'Численность на конец'])
+    for row in data['monthly_rows']:
+        ws1.append([row['month'], row['hired'], row['dismissed'], row['diff'], row['headcount']])
+    ws1.append(['ИТОГО', data['total_hired'], data['total_dismissed'], data['total_diff'], ''])
+
+    # Лист 2: текучесть по цехам
+    ws2 = wb.create_sheet('Текучесть по цехам')
+    ws2.append(['Производство', 'Цех', 'Среднесписочная', 'Принято', 'Уволено', 'Разница', 'Текучесть %'])
+    for ws in data['workshop_rows']:
+        ws2.append([
+            ws.production.name if ws.production else '—',
+            f"Цех {ws.number}",
+            ws.avg_count,
+            ws.hired,
+            ws.dismissed,
+            ws.diff,
+            ws.turnover_rate,
+        ])
+
+    # Лист 3: причины увольнений
+    ws3 = wb.create_sheet('Причины увольнений')
+    ws3.append(['Причина', 'Кол-во', '%'])
+    for r in data['reasons_total']:
+        ws3.append([r['dismissal_reason__name'], r['count'], r['pct']])
+
+    # Лист 4: матрица цех × причина
+    if data['matrix_rows']:
+        ws4 = wb.create_sheet('Причины по цехам')
+        header = ['Цех', 'Производство'] + data['reason_order'] + ['Итого']
+        ws4.append(header)
+        for row in data['matrix_rows']:
+            line = [f"Цех {row['workshop']}", row['production']]
+            line += [row['reasons'].get(r, 0) for r in data['reason_order']]
+            line += [row['total']]
+            ws4.append(line)
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="movement_{year}.xlsx"'
+    wb.save(response)
+    return response
+
+@login_required_custom
+def profile_view(request):
+    """
+    Страница профиля пользователя.
+    Показывает данные учётной записи и форму смены пароля.
+    При успешной смене пароля пользователь остаётся залогинен.
+    """
+    from django.contrib.auth import update_session_auth_hash
+    from core.models import UserProfile
+ 
+    user = request.user
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+ 
+    error = None
+ 
+    if request.method == 'POST':
+        current_password = request.POST.get('current_password', '')
+        new_password     = request.POST.get('new_password', '')
+        confirm_password = request.POST.get('confirm_password', '')
+ 
+        if not user.check_password(current_password):
+            error = 'Неверный текущий пароль'
+        elif new_password != confirm_password:
+            error = 'Новые пароли не совпадают'
+        elif len(new_password) < 8:
+            error = 'Пароль должен содержать не менее 8 символов'
+        elif new_password.isdigit():
+            error = 'Пароль не должен состоять только из цифр'
+        elif user.check_password(new_password):
+            error = 'Новый пароль не должен совпадать с текущим'
+        else:
+            user.set_password(new_password)
+            user.save()
+            update_session_auth_hash(request, user)
+            messages.success(request, 'Пароль успешно изменён')
+            return redirect('core:profile')
+ 
+    return render(request, 'core/profile.html', {
+        'profile': profile,
+        'error':   error,
+    })

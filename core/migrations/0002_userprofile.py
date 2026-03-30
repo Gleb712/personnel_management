@@ -18,6 +18,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('role', models.CharField(choices=[('admin', 'Администратор'), ('hr', 'Директор по персоналу'), ('editor', 'Редактор'), ('viewer', 'Просмотр')], default='viewer', max_length=20, verbose_name='Роль')),
+                ('full_name', models.CharField(blank=True, default='', help_text='Полное ФИО пользователя', max_length=255, verbose_name='ФИО')),
                 ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='profile', to=settings.AUTH_USER_MODEL, verbose_name='Пользователь')),
             ],
             options={

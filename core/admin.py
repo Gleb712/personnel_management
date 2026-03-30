@@ -5,9 +5,10 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin, GroupAdmin as 
 from django.contrib.auth.models import User, Group
 from django.utils.html import format_html, mark_safe
 
-from .models import (
+from core.models import (
     Employee, Production, Workshop,
-    DismissalReason, EmployeeCategory, Position
+    DismissalReason, EmployeeCategory, Position,
+    UserProfile
 )
 
 GROUP_META = {
@@ -40,12 +41,20 @@ MODEL_RU = {
     'user': 'Пользователи',
 }
 
+class UserProfileInline(admin.StackedInline):
+    model = UserProfile
+    can_delete = False
+    verbose_name = 'Данные сотрудника'
+    verbose_name_plural = 'Данные сотрудника'
+    fields = ('full_name',)
+    extra = 1
+    max_num = 1
 
 # Пользователи
-
 class UserAdmin(BaseUserAdmin):
-    list_display  = ('username', 'email', 'first_name', 'last_name',
-                     'get_groups_display', 'is_active', 'is_staff')
+    inlines      = [UserProfileInline]
+    list_display = ('username', 'email', 'get_fio',
+                    'get_groups_display', 'is_active', 'is_staff')
     list_filter   = ('is_active', 'is_staff', 'groups')
     search_fields = ('username', 'email', 'first_name', 'last_name')
     ordering      = ('username',)
@@ -106,6 +115,14 @@ class UserAdmin(BaseUserAdmin):
             return False
         return super().has_delete_permission(request, obj)
 
+    @admin.display(description='ФИО')
+    def get_fio(self, obj):
+        try:
+            name = obj.profile.full_name
+            return name if name else mark_safe('<span style="color:#9ca3af">—</span>')
+        except Exception:
+            return mark_safe('<span style="color:#9ca3af">—</span>')
+
     @admin.display(description='Роль / Группа')
     def get_groups_display(self, obj):
         if obj.is_superuser:
@@ -136,6 +153,21 @@ class GroupAdmin(BaseGroupAdmin):
     def has_delete_permission(self, request, obj=None):
         # Только суперпользователь может удалять группы
         return request.user.is_superuser
+    
+    def formfield_for_manytomany(self, db_field, request, **kwargs):
+        """
+        Ограничивает список доступных групп для роли администратора.
+        Ограничиваем список видимых групп до 4 стандартных.
+        """
+        if db_field.name == 'groups' and not request.user.is_superuser:
+            from django.contrib.auth.models import Group
+            kwargs['queryset'] = Group.objects.filter(name__in=[
+                'Администратор',
+                'Директор по персоналу',
+                'Редактор',
+                'Просмотр',
+            ])
+        return super().formfield_for_manytomany(db_field, request, **kwargs)
 
     def has_change_permission(self, request, obj=None):
         # Администратор может открыть группу для просмотра, но не сохранить

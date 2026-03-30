@@ -1,11 +1,3 @@
-"""
-Содержимое для core/migrations/0003_setup_groups.py
-
-Создать пустую миграцию:
-    python manage.py makemigrations core --empty --name=setup_groups
-
-Затем вставить этот код в созданный файл.
-"""
 from django.db import migrations
 
 
@@ -63,8 +55,9 @@ def create_groups(apps, schema_editor):
             perms('core', 'employeecategory', 'view', 'add', 'change', 'delete') +
             perms('core', 'position',         'view', 'add', 'change', 'delete') +
             # Права на пользователей: просмотр, редактирование, добавление
-            # (добавление нужно чтобы сбрасывать пароль через форму Django)
-            perms('auth', 'user',             'view', 'add', 'change')
+            # Добавление нужно чтобы сбрасывать пароль через форму Django
+            perms('auth', 'user',             'view', 'add', 'change') +
+            perms("core", "userprofile",      "view", "add", "change")
         ),
     }
 

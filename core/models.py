@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.contrib.auth.models import User
  
  
 class Production(models.Model):
@@ -200,3 +201,60 @@ class Employee(models.Model):
     def __str__(self):
         return f"{self.full_name} №({self.employee_number})"
     
+class UserProfile(models.Model):
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='profile',
+        verbose_name='Пользователь'
+    )
+    role = models.CharField(
+        max_length=20,
+        choices=[
+            ('admin', 'Администратор'),
+            ('hr', 'Директор по персоналу'),
+            ('editor', 'Редактор'),
+            ('viewer', 'Просмотр'),
+        ],
+        default='viewer',
+        verbose_name='Роль'
+    )
+    # Полное ФИО сотрудника: "Иванов Иван Иванович"
+    # Заполняется вручную при создании пользователя в /admin/
+    full_name = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name='ФИО',
+        help_text='Полное ФИО: Фамилия Имя Отчество'
+    )
+ 
+    class Meta:
+        verbose_name = 'Профиль пользователя'
+        verbose_name_plural = 'Профили пользователей'
+ 
+    def __str__(self):
+        return f'Профиль: {self.user.username}'
+ 
+    def get_short_name(self):
+        """
+        Возвращает ФИО в формате "Фамилия И.О."
+        Примеры:
+            "Иванов Иван Иванович» - "Иванов И.И."
+            "Иванов Иван - "Иванов И."
+            "" - "username"
+        """
+        name = self.full_name.strip()
+        if not name:
+            return self.user.username
+        parts = name.split()
+        if len(parts) >= 3:
+            return f"{parts[0]} {parts[1][0]}.{parts[2][0]}."
+        if len(parts) == 2:
+            return f"{parts[0]} {parts[1][0]}."
+        return name
+ 
+    def get_display_name(self):
+        """Возвращает полное ФИО или username если ФИО не заполнено."""
+        return self.full_name.strip() or self.user.username
+ 

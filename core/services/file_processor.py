@@ -168,6 +168,38 @@ class EmployeeFileProcessor:
             cache[value] = obj
         return cache[value]
 
+    def _get_or_create_workshop(self, number_val, production_obj):
+        """
+        Получить или создать цех, при создании сразу привязывая производство.
+
+        Если цех уже существует без производства — обновляем production.
+        Это гарантирует что справочник Workshop.production заполнен корректно
+        после загрузки файла.
+
+        Args:
+            number_val:     номер цеха (строка)
+            production_obj: объект Production или None
+
+        Returns:
+            Workshop или None
+        """
+        if not number_val:
+            return None
+        number_val = str(number_val).strip()
+        if not number_val or number_val.lower() in ('nan', 'none'):
+            return None
+
+        if number_val not in self._workshop_cache:
+            ws, created = Workshop.objects.get_or_create(number=number_val)
+            # Если цех только что создан или у него не заполнено производство —
+            # привязываем production из текущей строки файла
+            if production_obj and ws.production_id != production_obj.pk:
+                ws.production = production_obj
+                ws.save(update_fields=['production'])
+            self._workshop_cache[number_val] = ws
+
+        return self._workshop_cache[number_val]
+
     # ========== Парсинг одной строки ==========
 
     def _parse_row(self, row, row_num):
@@ -215,7 +247,7 @@ class EmployeeFileProcessor:
             'hire_date': hire_date,
         }
 
-        # ── НЕОБЯЗАТЕЛЬНЫЕ ДАТЫ ────────────────────────────────────────────────
+        # НЕОБЯЗАТЕЛЬНЫЕ ДАТЫ
         #
         # СТРОГОЕ обновление (активно):
         # Пустая ячейка в файле записывает None в БД.
@@ -243,7 +275,7 @@ class EmployeeFileProcessor:
         #         except ValueError as e:
         #             self.errors.append(f"Строка {row_num}: {e}")
 
-        # ── НЕОБЯЗАТЕЛЬНЫЕ СПРАВОЧНИКИ ─────────────────────────────────────────
+        # НЕОБЯЗАТЕЛЬНЫЕ СПРАВОЧНИКИ
         #
         # СТРОГОЕ обновление (активно):
         # Пустая ячейка в файле записывает None (связь с справочником обнуляется).
@@ -255,8 +287,10 @@ class EmployeeFileProcessor:
 
         if 'цех' in keys:
             workshop_val = get('цех')
-            data['workshop'] = self._get_or_create(
-                self._workshop_cache, Workshop, workshop_val, field='number'
+            # Передаём production_obj чтобы при создании цеха сразу привязать производство
+            data['workshop'] = self._get_or_create_workshop(
+                workshop_val,
+                data.get('production'),
             ) if workshop_val else None
 
         if 'причина увольнения' in keys:
@@ -408,4 +442,3 @@ class EmployeeFileProcessor:
             'total': len(df),
             'duration': duration,
         }
-    
