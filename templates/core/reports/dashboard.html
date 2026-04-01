@@ -1,0 +1,658 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load core_extras %}
+{% block title %}Дашборд{% endblock %}
+{% block page_title %}Дашборд{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block topbar_actions %}
+<form method="get" class="d-flex gap-2 align-items-center">
+    <select class="form-select form-select-sm" name="year" onchange="this.form.submit()" style="width:auto">
+        {% for y in available_years %}
+        <option value="{{ y }}" {% if selected_year == y|stringformat:"s" %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+    </select>
+</form>
+{% endblock %}
+
+{% block content %}
+
+{# Итоговые карточки #}
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="dash-card">
+            <div class="dash-card-icon" style="background:rgba(37,99,235,.12);color:#2563eb">
+                <i class="bi bi-people-fill"></i>
+            </div>
+            <div>
+                <div class="dash-card-num">{{ headcount.grand_total }}</div>
+                <div class="dash-card-lbl">Работает сейчас</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="dash-card">
+            <div class="dash-card-icon" style="background:rgba(22,163,74,.12);color:#16a34a">
+                <i class="bi bi-person-plus-fill"></i>
+            </div>
+            <div>
+                <div class="dash-card-num" style="color:#16a34a">{{ movement.total_hired }}</div>
+                <div class="dash-card-lbl">Принято за {{ movement.year }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="dash-card">
+            <div class="dash-card-icon" style="background:rgba(220,38,38,.12);color:#dc2626">
+                <i class="bi bi-person-dash-fill"></i>
+            </div>
+            <div>
+                <div class="dash-card-num" style="color:#dc2626">{{ movement.total_dismissed }}</div>
+                <div class="dash-card-lbl">Уволено за {{ movement.year }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="dash-card">
+            <div class="dash-card-icon" style="background:rgba(217,119,6,.12);color:#d97706">
+                <i class="bi bi-arrow-repeat"></i>
+            </div>
+            <div>
+                <div class="dash-card-num" style="color:{% if turnover_rate > 20 %}#dc2626{% elif turnover_rate > 10 %}#d97706{% else %}#16a34a{% endif %}">
+                    {{ turnover_rate }}%
+                </div>
+                <div class="dash-card-lbl">Текучесть за {{ movement.year }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Подкарточки: РСС / Рабочие / Разница #}
+<div class="row g-3 mb-4">
+    <div class="col-4">
+        <div class="dash-sub-card">
+            <span class="dash-sub-lbl">РСС</span>
+            <span class="dash-sub-val" style="color:#2563eb">{{ headcount.grand_rss }}</span>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="dash-sub-card">
+            <span class="dash-sub-lbl">Рабочие</span>
+            <span class="dash-sub-val" style="color:#16a34a">{{ headcount.grand_workers }}</span>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="dash-sub-card">
+            <span class="dash-sub-lbl">Разница за год</span>
+            <span class="dash-sub-val" style="color:{% if movement.total_diff > 0 %}#16a34a{% elif movement.total_diff < 0 %}#dc2626{% else %}var(--text-muted){% endif %}">
+                {% if movement.total_diff > 0 %}+{% endif %}{{ movement.total_diff }}
+            </span>
+        </div>
+    </div>
+</div>
+
+{# График 1: Помесячная динамика #}
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-graph-up" style="color:var(--accent)"></i>
+        Динамика движения персонала — {{ movement.year }}
+    </div>
+    <div style="padding:20px;position:relative;height:340px">
+        <canvas id="chartMonthly"></canvas>
+    </div>
+</div>
+
+{# График 2: Текучесть по цехам #}
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-bar-chart-line" style="color:var(--accent)"></i>
+        Текучесть по цехам — {{ movement.year }}
+    </div>
+    <div style="padding:20px;position:relative;height:360px">
+        <canvas id="chartWorkshops"></canvas>
+    </div>
+</div>
+
+{# График 3 + 4: Причины увольнений + Причины по цехам #}
+{% if movement.reasons_total %}
+<div class="row g-4 mb-3">
+    <div class="col-lg-5">
+        <div class="card" style="height:100%">
+            <div class="card-header">
+                <i class="bi bi-pie-chart" style="color:var(--accent)"></i>
+                Причины увольнений — {{ movement.year }}
+            </div>
+            <div style="padding:20px;display:flex;justify-content:center;align-items:center;min-height:360px">
+                <div style="width:100%;max-width:340px">
+                    <canvas id="chartReasons"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% if movement.matrix_rows %}
+    <div class="col-lg-7">
+        <div class="card" style="height:100%">
+            <div class="card-header">
+                <i class="bi bi-grid-3x3" style="color:var(--accent)"></i>
+                Причины увольнений по цехам — {{ movement.year }}
+            </div>
+            <div style="padding:20px;position:relative;height:380px">
+                <canvas id="chartMatrix"></canvas>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{# Общая легенда причин увольнений #}
+<div id="shared-reasons-legend" class="card mb-4" style="border-radius:10px"">
+    <div style="padding:10px 20px;display:flex;flex-wrap:wrap;gap:10px 18px;justify-content:center"></div>
+</div>
+{% endif %}
+
+{# График 5: Численность по производствам #}
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-building" style="color:var(--accent)"></i>
+        Численность по производствам
+    </div>
+    <div style="padding:20px;position:relative;height:380px">
+        <canvas id="chartHeadcount"></canvas>
+    </div>
+</div>
+
+{# Таблица: Топ цехов по текучести #}
+{% if top_workshops %}
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-exclamation-triangle" style="color:#d97706"></i>
+        Цеха с наибольшей текучестью — {{ movement.year }}
+    </div>
+    <div style="overflow-x:auto">
+        <table class="table mb-0">
+            <thead>
+                <tr>
+                    <th>Цех</th>
+                    <th>Производство</th>
+                    <th style="text-align:center">Работало, чел.</th>
+                    <th style="text-align:center;color:#16a34a">Принято</th>
+                    <th style="text-align:center;color:#dc2626">Уволено</th>
+                    <th style="text-align:center">Коэф. текучести</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ws in top_workshops %}
+                <tr>
+                    <td style="font-weight:500">Цех {{ ws.number }}</td>
+                    <td style="color:var(--text-secondary)">{{ ws.production.name|default:"—" }}</td>
+                    <td style="text-align:center">{{ ws.avg_count }}</td>
+                    <td style="text-align:center;color:#16a34a;font-weight:600">
+                        {% if ws.hired > 0 %}{{ ws.hired }}{% else %}—{% endif %}
+                    </td>
+                    <td style="text-align:center;color:#dc2626;font-weight:600">
+                        {% if ws.dismissed > 0 %}{{ ws.dismissed }}{% else %}—{% endif %}
+                    </td>
+                    <td style="text-align:center">
+                        <span style="font-weight:700;padding:3px 10px;border-radius:12px;font-size:12px;
+                                     background:{% if ws.turnover_rate > 20 %}rgba(220,38,38,.12){% elif ws.turnover_rate > 10 %}rgba(217,119,6,.12){% else %}rgba(22,163,74,.12){% endif %};
+                                     color:{% if ws.turnover_rate > 20 %}#dc2626{% elif ws.turnover_rate > 10 %}#d97706{% else %}#16a34a{% endif %}">
+                            {{ ws.turnover_rate }}%
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{# JSON-данные для JS #}
+{{ movement.reason_order|json_script:"json-reason-order" }}
+
+<script id="json-workshops" type="application/json">
+[{% for ws in movement.workshop_rows %}{
+    "number": {{ ws.number }},
+    "rate": {{ ws.turnover_rate|stringformat:"g" }}
+}{% if not forloop.last %},{% endif %}{% endfor %}]
+</script>
+
+<script id="json-matrix-rows" type="application/json">
+[{% for row in movement.matrix_rows %}{
+    "workshop": {{ row.workshop }},
+    "production": "{{ row.production }}",
+    "reasons": { {% for r in movement.reason_order %}"{{ r }}": {{ row.reasons|get_item:r }}{% if not forloop.last %}, {% endif %}{% endfor %} },
+    "total": {{ row.total }}
+}{% if not forloop.last %},{% endif %}{% endfor %}]
+</script>
+
+<script id="json-headcount" type="application/json">
+[{% for prod in headcount.by_production %}{
+    "name": "{{ prod.name }}",
+    "rss": {{ prod.rss }},
+    "workers": {{ prod.workers }},
+    "total": {{ prod.total }}
+}{% if not forloop.last %},{% endif %}{% endfor %}]
+</script>
+
+<style>
+/* Стили дашборда */
+.dash-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    transition: box-shadow .15s;
+}
+.dash-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,.1);
+}
+.dash-card-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+.dash-card-num {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--text-primary);
+}
+.dash-card-lbl {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+.dash-sub-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+}
+.dash-sub-lbl {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+.dash-sub-val {
+    font-size: 18px;
+    font-weight: 700;
+}
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'vendors/chartjs/chart.umd.min.js' %}"></script>
+
+<script>
+/* Общие настройки Chart.js */
+Chart.defaults.font.family = "'Inter', 'Segoe UI', system-ui, sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.color = '#6b7280';
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+Chart.defaults.plugins.legend.labels.pointStyleWidth = 10;
+Chart.defaults.plugins.legend.labels.padding = 16;
+
+const TOOLTIP_STYLE = {
+    backgroundColor: 'rgba(15,23,42,0.92)',
+    titleFont: { weight: '600', size: 13 },
+    bodyFont: { size: 12 },
+    padding: 12,
+    cornerRadius: 8,
+    boxPadding: 4
+};
+
+/* График 1: Помесячная динамика */
+(function() {
+    const labels = [{% for row in movement.monthly_rows %}'{{ row.month }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+    const hired = [{% for row in movement.monthly_rows %}{{ row.hired }}{% if not forloop.last %},{% endif %}{% endfor %}];
+    const dismissed = [{% for row in movement.monthly_rows %}{{ row.dismissed }}{% if not forloop.last %},{% endif %}{% endfor %}];
+    const headcount = [{% for row in movement.monthly_rows %}{{ row.headcount }}{% if not forloop.last %},{% endif %}{% endfor %}];
+
+    const ctx = document.getElementById('chartMonthly');
+    if (!ctx) return;
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Принято',
+                    data: hired,
+                    backgroundColor: 'rgba(22,163,74,0.72)',
+                    borderColor: '#16a34a',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    order: 2
+                },
+                {
+                    label: 'Уволено',
+                    data: dismissed,
+                    backgroundColor: 'rgba(220,38,38,0.72)',
+                    borderColor: '#dc2626',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    order: 2
+                },
+                {
+                    label: 'Численность',
+                    data: headcount,
+                    type: 'line',
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37,99,235,0.06)',
+                    borderWidth: 2.5,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#2563eb',
+                    fill: true,
+                    tension: 0.35,
+                    yAxisID: 'y1',
+                    order: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                tooltip: {
+                    ...TOOLTIP_STYLE,
+                    callbacks: {
+                        label(ctx) {
+                            return ' ' + ctx.dataset.label + ': ' + ctx.parsed.y + ' чел.';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { grid: { display: false } },
+                y: {
+                    title: { display: true, text: 'Принято / Уволено, чел.' },
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0,0,0,0.04)' }
+                },
+                y1: {
+                    position: 'right',
+                    title: { display: true, text: 'Численность, чел.' },
+                    grid: { drawOnChartArea: false },
+                    beginAtZero: false
+                }
+            }
+        }
+    });
+})();
+
+/* График 2: Текучесть по цехам */
+(function() {
+    const workshops = JSON.parse(document.getElementById('json-workshops')?.textContent || '[]');
+    if (!workshops.length) return;
+
+    /* Сортировка по номеру цеха по возрастанию */
+    workshops.sort((a, b) => a.number - b.number);
+
+    const labels = workshops.map(w => 'Цех ' + w.number);
+    const rates = workshops.map(w => w.rate);
+    const colors = rates.map(r => r > 20 ? 'rgba(220,38,38,0.75)' : r > 10 ? 'rgba(217,119,6,0.75)' : 'rgba(22,163,74,0.75)');
+
+    const ctx = document.getElementById('chartWorkshops');
+    if (!ctx) return;
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Текучесть, %',
+                data: rates,
+                backgroundColor: colors,
+                borderRadius: 4,
+                borderSkipped: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    ...TOOLTIP_STYLE,
+                    callbacks: { label: ctx => ' Текучесть: ' + ctx.parsed.y + '%' }
+                }
+            },
+            scales: {
+                x: { grid: { display: false } },
+                y: {
+                    title: { display: true, text: 'Коэффициент текучести, %' },
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0,0,0,0.04)' }
+                }
+            }
+        },
+        plugins: [{
+            id: 'thresholdLines',
+            afterDraw(chart) {
+                const yAxis = chart.scales.y;
+                const ctx2 = chart.ctx;
+                [10, 20].forEach((val, i) => {
+                    if (val > yAxis.max) return;
+                    const y = yAxis.getPixelForValue(val);
+                    ctx2.save();
+                    ctx2.strokeStyle = i === 0 ? '#d97706' : '#dc2626';
+                    ctx2.lineWidth = 1.5;
+                    ctx2.setLineDash([6, 4]);
+                    ctx2.beginPath();
+                    ctx2.moveTo(chart.chartArea.left, y);
+                    ctx2.lineTo(chart.chartArea.right, y);
+                    ctx2.stroke();
+                    ctx2.fillStyle = ctx2.strokeStyle;
+                    ctx2.font = '11px Inter, sans-serif';
+                    ctx2.textAlign = 'right';
+                    ctx2.fillText(val + '%', chart.chartArea.right + 36, y + 4);
+                    ctx2.restore();
+                });
+            }
+        }]
+    });
+})();
+
+/* Общая палитра причин увольнений (графики 3 и 4) */
+const REASON_PALETTE = [
+    '#6b8cae','#8fae6b','#ae8f6b','#6bae9f','#9f6bae',
+    '#ae6b86','#6ba2ae','#7a9e5c','#c2956b','#5c7a9e',
+    '#9e5c7a','#5c9e8a','#8a5c9e','#9e8a5c','#5c8a9e'
+];
+const reasonOrder = JSON.parse(document.getElementById('json-reason-order')?.textContent || '[]');
+
+/* График 3: Причины увольнений */
+(function() {
+    const labels = [{% for r in movement.reasons_total %}'{{ r.dismissal_reason__name }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+    const values = [{% for r in movement.reasons_total %}{{ r.count }}{% if not forloop.last %},{% endif %}{% endfor %}];
+
+    if (!labels.length) return;
+
+    const ctx = document.getElementById('chartReasons');
+    if (!ctx) return;
+
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels,
+            datasets: [{
+                data: values,
+                backgroundColor: labels.map((_, i) => REASON_PALETTE[i % REASON_PALETTE.length]),
+                borderWidth: 2,
+                borderColor: 'var(--surface)',
+                hoverOffset: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            cutout: '55%',
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    ...TOOLTIP_STYLE,
+                    callbacks: {
+                        label(ctx) {
+                            const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                            const pct = total ? (ctx.parsed / total * 100).toFixed(1) : 0;
+                            return ' ' + ctx.label + ': ' + ctx.parsed + ' (' + pct + '%)';
+                        }
+                    }
+                }
+            }
+        },
+        plugins: [{
+            id: 'centerText',
+            afterDraw(chart) {
+                const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                const { width, height, top, left } = chart.chartArea;
+                const ctx2 = chart.ctx;
+                ctx2.save();
+                ctx2.textAlign = 'center';
+                ctx2.textBaseline = 'middle';
+                const cx = left + width / 2;
+                const cy = top + height / 2;
+                ctx2.font = 'bold 24px Inter, sans-serif';
+                ctx2.fillStyle = '#1f2937';
+                ctx2.fillText(total, cx, cy - 8);
+                ctx2.font = '12px Inter, sans-serif';
+                ctx2.fillStyle = '#6b7280';
+                ctx2.fillText('уволено', cx, cy + 14);
+                ctx2.restore();
+            }
+        }]
+    });
+})();
+
+/* График 4: Матрица цех × причина */
+(function() {
+    const matrixRows = JSON.parse(document.getElementById('json-matrix-rows')?.textContent || '[]');
+    if (!matrixRows.length || !reasonOrder.length) return;
+
+    const ctx = document.getElementById('chartMatrix');
+    if (!ctx) return;
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: matrixRows.map(r => 'Цех ' + r.workshop),
+            datasets: reasonOrder.map((reason, i) => ({
+                label: reason,
+                data: matrixRows.map(row => row.reasons[reason] || 0),
+                backgroundColor: REASON_PALETTE[i % REASON_PALETTE.length],
+                borderRadius: 2,
+                borderSkipped: false
+            }))
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    ...TOOLTIP_STYLE,
+                    callbacks: { label: ctx => ' ' + ctx.dataset.label + ': ' + ctx.parsed.y + ' чел.' }
+                }
+            },
+            scales: {
+                x: { stacked: true, grid: { display: false } },
+                y: {
+                    stacked: true,
+                    title: { display: true, text: 'Уволено, чел.' },
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0,0,0,0.04)' }
+                }
+            }
+        }
+    });
+})();
+
+/* Общая легенда причин увольнений */
+(function() {
+    const container = document.querySelector('#shared-reasons-legend > div');
+    if (!container || !reasonOrder.length) return;
+
+    reasonOrder.forEach((reason, i) => {
+        const item = document.createElement('span');
+        item.style.cssText = 'display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text-secondary)';
+        const dot = document.createElement('span');
+        dot.style.cssText = 'width:10px;height:10px;border-radius:3px;flex-shrink:0;background:' + REASON_PALETTE[i % REASON_PALETTE.length];
+        item.appendChild(dot);
+        item.appendChild(document.createTextNode(reason));
+        container.appendChild(item);
+    });
+})();
+
+/* График 5: Численность по производствам */
+(function() {
+    const data = JSON.parse(document.getElementById('json-headcount')?.textContent || '[]');
+    if (!data.length) return;
+
+    const ctx = document.getElementById('chartHeadcount');
+    if (!ctx) return;
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.map(d => d.name),
+            datasets: [
+                {
+                    label: 'РСС',
+                    data: data.map(d => d.rss),
+                    backgroundColor: 'rgba(37,99,235,0.75)',
+                    borderRadius: 4,
+                    borderSkipped: false
+                },
+                {
+                    label: 'Рабочие',
+                    data: data.map(d => d.workers),
+                    backgroundColor: 'rgba(22,163,74,0.75)',
+                    borderRadius: 4,
+                    borderSkipped: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                tooltip: {
+                    ...TOOLTIP_STYLE,
+                    callbacks: { label: ctx => ' ' + ctx.dataset.label + ': ' + ctx.parsed.y + ' чел.' }
+                }
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    grid: { display: false },
+                    ticks: { display: false },
+                    title: { display: true, text: 'Производства' }
+                },
+                y: {
+                    stacked: true,
+                    title: { display: true, text: 'Численность, чел.' },
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0,0,0,0.04)' }
+                }
+            }
+        }
+    });
+})();
+</script>
+{% endblock %}

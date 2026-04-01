@@ -88,7 +88,7 @@ class EmployeeFileProcessor:
                         df = pd.read_csv(
                             StringIO(decoded),
                             dtype=str,
-                            sep=None,
+                            sep=';',
                             engine='python'
                         )
                         break

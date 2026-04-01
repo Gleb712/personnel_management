@@ -20,6 +20,54 @@ from .models import Employee, Production, Workshop
 
 from core.permissions import login_required_custom
 
+def _style_excel_sheet(ws, header_row=1):
+    """
+    Применяет оформление к листу Excel:
+    Заголовок: приглушённый фон + полужирный шрифт
+    Все ячейки: тонкая рамка + выравнивание
+    Автоширина колонок
+    """
+    thin_border = Border(
+        left=Side(style='thin', color='C0C0C0'),
+        right=Side(style='thin', color='C0C0C0'),
+        top=Side(style='thin', color='C0C0C0'),
+        bottom=Side(style='thin', color='C0C0C0'),
+    )
+    header_font = Font(bold=True, size=10, color='333333')
+    header_fill = PatternFill(start_color='EDEDED', end_color='EDEDED', fill_type='solid')
+    body_font = Font(size=10, color='444444')
+    center = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    left = Alignment(horizontal='left', vertical='center', wrap_text=True)
+
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=ws.max_column):
+        for cell in row:
+            cell.border = thin_border
+            if cell.row == header_row:
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = center
+            else:
+                cell.font = body_font
+                # Первые 2 колонки — текст, остальные — по центру
+                cell.alignment = left if cell.column <= 2 else center
+
+    # Автоширина
+    for col_idx in range(1, ws.max_column + 1):
+        max_len = 0
+        col_letter = get_column_letter(col_idx)
+        for cell in ws[col_letter]:
+            if cell.value:
+                max_len = max(max_len, len(str(cell.value)))
+        ws.column_dimensions[col_letter].width = min(max_len + 4, 30)
+
+def _style_total_row(ws, row_num):
+    """Выделяет строку итогов: полужирный шрифт + темный фон."""
+    total_font = Font(bold=True, size=10, color='222222')
+    total_fill = PatternFill(start_color='E0E0E0', end_color='E0E0E0', fill_type='solid')
+    for cell in ws[row_num]:
+        cell.font = total_font
+        cell.fill = total_fill
+
 def login_view(request):
     """Страница входа. После успешной авторизации редиректит по роли."""
     if request.user.is_authenticated:
@@ -335,6 +383,14 @@ def report_headcount_export(request):
     # Общий итог
     ws.append(['ИТОГО', '', data['grand_total'], data['grand_rss'], data['grand_workers']])
 
+    # Оформление
+    _style_excel_sheet(ws)
+    _style_total_row(ws, ws.max_row)
+    # Строки промежуточных итогов по производствам
+    for row in ws.iter_rows(min_row=2, max_row=ws.max_row - 1):
+        if row[0].value and str(row[0].value).startswith('Итого'):
+            _style_total_row(ws, row[0].row)
+
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
@@ -425,6 +481,13 @@ def report_movement_export(request):
             line += [row['total']]
             ws4.append(line)
 
+    # Оформление всех листов
+    for sheet in wb.worksheets:
+        _style_excel_sheet(sheet)
+        # Строка ИТОГО — последняя на листах 1-3
+        if sheet.title in ('Динамика по месяцам', 'Причины увольнений'):
+            _style_total_row(sheet, sheet.max_row)
+            
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
@@ -472,4 +535,39 @@ def profile_view(request):
     return render(request, 'core/profile.html', {
         'profile': profile,
         'error':   error,
+    })
+
+@can_view
+def dashboard(request):
+    """Дашборд — сводная аналитика по персоналу."""
+    from core.services.report_service import get_headcount_report, get_movement_report
+    from datetime import date as _date
+
+    year_param = request.GET.get('year', '')
+    year = int(year_param) if year_param else _date.today().year
+
+    headcount = get_headcount_report()
+    movement = get_movement_report(year=year)
+
+    # Общий коэффициент текучести = уволено / среднесписочная * 100
+    avg_headcount = headcount['grand_total']
+    if avg_headcount:
+        turnover_rate = round(movement['total_dismissed'] / avg_headcount * 100, 1)
+    else:
+        turnover_rate = 0
+
+    # Топ-5 цехов по текучести (для таблицы внизу)
+    top_workshops = sorted(
+        movement['workshop_rows'],
+        key=lambda ws: ws.turnover_rate,
+        reverse=True
+    )[:10]
+
+    return render(request, 'core/reports/dashboard.html', {
+        'headcount':       headcount,
+        'movement':        movement,
+        'turnover_rate':   turnover_rate,
+        'top_workshops':   top_workshops,
+        'available_years': movement['available_years'],
+        'selected_year':   str(year),
     })
