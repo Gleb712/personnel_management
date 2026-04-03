@@ -58,8 +58,13 @@
                     </div>
 
                     <div class="col-md-6">
-                        <label class="form-label">{{ form.production.label }}</label>
-                        {{ form.production }}
+                        <label class="form-label">Производство</label>
+                        <input type="text" class="form-control" disabled
+                               value="{{ employee.production.name|default:'Определяется по цеху' }}"
+                               style="background:var(--surface-2);color:var(--text-secondary)">
+                        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+                            Заполняется автоматически при выборе цеха
+                        </div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">{{ form.workshop.label }}</label>

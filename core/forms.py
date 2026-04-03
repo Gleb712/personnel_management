@@ -45,7 +45,7 @@ class EmployeeEditForm(forms.ModelForm):
         model = Employee
         fields = [
             'full_name', 'birth_date', 'hire_date', 'dismissal_date',
-            'production', 'workshop', 'position', 'employee_category', 'dismissal_reason'
+            'workshop', 'position', 'employee_category', 'dismissal_reason'
         ]
         widgets = {
             'full_name': forms.TextInput(
@@ -62,9 +62,6 @@ class EmployeeEditForm(forms.ModelForm):
             'dismissal_date': forms.DateInput(
                 format='%Y-%m-%d',
                 attrs={'class': 'form-control', 'type': 'date'}
-            ),
-            'production': forms.Select(
-                attrs={'class': 'form-select'}
             ),
             'workshop': forms.Select(
                 attrs={'class': 'form-select'}

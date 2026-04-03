@@ -235,14 +235,15 @@ class EmployeeAdmin(admin.ModelAdmin):
     list_filter     = ['production', 'workshop', 'employee_category', 'position', 'dismissal_reason']
     search_fields   = ['full_name', 'employee_number']
     date_hierarchy  = 'hire_date'
-    readonly_fields = ['created_at', 'updated_at']
+    readonly_fields = ['created_at', 'updated_at', 'production']
     list_per_page   = 100
 
     fieldsets = (
         ('Основное',     {'fields': ('full_name', 'employee_number', 'birth_date')}),
         ('Даты работы',  {'fields': ('hire_date', 'dismissal_date', 'dismissal_reason'),
                           'description': 'Если сотрудник работает — поле «Дата увольнения» оставьте пустым.'}),
-        ('Место работы', {'fields': ('production', 'workshop', 'position', 'employee_category')}),
+        ('Место работы', {'fields': ('workshop', 'production', 'position', 'employee_category'),
+                          'description': 'Производство заполняется автоматически по цеху.'}),
         ('Служебное',    {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
     )
 

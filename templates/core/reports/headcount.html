@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load core_extras %}
 {% block title %}Численность{% endblock %}
 {% block page_title %}Отчёт: Численность{% endblock %}
 {% block nav_report_headcount %}active{% endblock %}
@@ -52,24 +53,20 @@
 
 <!-- Итоговые карточки -->
 <div class="row g-3 mb-4">
-    <div class="col-6 col-md-4">
+    <div class="col-6 col-md-3">
         <div class="stat-card">
             <div class="stat-num">{{ data.grand_total }}</div>
             <div class="stat-lbl">Всего работает</div>
         </div>
     </div>
-    <div class="col-6 col-md-4">
+    {% for cat_name, cat_count in data.grand_categories.items %}
+    <div class="col-6 col-md-3">
         <div class="stat-card">
-            <div class="stat-num" style="color:#2563eb">{{ data.grand_rss }}</div>
-            <div class="stat-lbl">РСС</div>
+            <div class="stat-num">{{ cat_count }}</div>
+            <div class="stat-lbl">{{ cat_name }}</div>
         </div>
     </div>
-    <div class="col-6 col-md-4">
-        <div class="stat-card">
-            <div class="stat-num" style="color:#16a34a">{{ data.grand_workers }}</div>
-            <div class="stat-lbl">Рабочие</div>
-        </div>
-    </div>
+    {% endfor %}
 </div>
 
 <!-- Таблица численности -->
@@ -85,8 +82,9 @@
                     <th style="min-width:200px">Производство</th>
                     <th style="min-width:80px">Цех</th>
                     <th style="text-align:center;min-width:80px">Всего</th>
-                    <th style="text-align:center;min-width:80px;color:#2563eb">РСС</th>
-                    <th style="text-align:center;min-width:80px;color:#16a34a">Рабочие</th>
+                    {% for cat in data.categories %}
+                    <th style="text-align:center;min-width:80px">{{ cat }}</th>
+                    {% endfor %}
                 </tr>
             </thead>
             <tbody>
@@ -112,14 +110,12 @@
                                {% if forloop.first %}border-top:2px solid var(--border){% endif %}">
                         {{ ws.total }}
                     </td>
-                    <td style="text-align:center;color:#2563eb;
-                               {% if forloop.first %}border-top:2px solid var(--border){% endif %}">
-                        {{ ws.rss }}
+                    {% for cat in data.categories %}
+                    <td style="text-align:center;
+                               {% if forloop.parentloop.first %}border-top:2px solid var(--border){% endif %}">
+                        {{ ws.cat_values|get_item:cat }}
                     </td>
-                    <td style="text-align:center;color:#16a34a;
-                               {% if forloop.first %}border-top:2px solid var(--border){% endif %}">
-                        {{ ws.workers }}
-                    </td>
+                    {% endfor %}
                 </tr>
                 {% endfor %}
 
@@ -131,13 +127,14 @@
                         Итого {{ prod.name }}
                     </td>
                     <td style="text-align:center;font-weight:700">{{ prod.total }}</td>
-                    <td style="text-align:center;font-weight:600;color:#2563eb">{{ prod.rss }}</td>
-                    <td style="text-align:center;font-weight:600;color:#16a34a">{{ prod.workers }}</td>
+                    {% for cat in data.categories %}
+                    <td style="text-align:center;font-weight:600">{{ prod.categories|get_item:cat }}</td>
+                    {% endfor %}
                 </tr>
 
                 {% empty %}
                 <tr>
-                    <td colspan="5" style="text-align:center;padding:40px;color:var(--text-muted)">
+                    <td colspan="20" style="text-align:center;padding:40px;color:var(--text-muted)">
                         <i class="bi bi-inbox" style="font-size:28px;display:block;margin-bottom:8px"></i>
                         Нет данных
                     </td>
@@ -155,12 +152,11 @@
                     <td style="text-align:center;font-weight:700;font-size:15px">
                         {{ data.grand_total }}
                     </td>
-                    <td style="text-align:center;font-weight:700;color:#2563eb;font-size:15px">
-                        {{ data.grand_rss }}
+                    {% for cat in data.categories %}
+                    <td style="text-align:center;font-weight:700;font-size:15px">
+                        {{ data.grand_categories|get_item:cat }}
                     </td>
-                    <td style="text-align:center;font-weight:700;color:#16a34a;font-size:15px">
-                        {{ data.grand_workers }}
-                    </td>
+                    {% endfor %}
                 </tr>
             </tfoot>
             {% endif %}

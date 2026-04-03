@@ -1,8 +1,8 @@
 {% extends 'base.html' %}
 {% load static %}
 {% load core_extras %}
-{% block title %}Дашборд{% endblock %}
-{% block page_title %}Дашборд{% endblock %}
+{% block title %}Визуализация{% endblock %}
+{% block page_title %}Визуализация{% endblock %}
 {% block nav_dashboard %}active{% endblock %}
 
 {% block topbar_actions %}
@@ -67,21 +67,17 @@
     </div>
 </div>
 
-{# Подкарточки: РСС / Рабочие / Разница #}
+{# Подкарточки: категории + разница #}
 <div class="row g-3 mb-4">
-    <div class="col-4">
+    {% for cat_name, cat_count in headcount.grand_categories.items %}
+    <div class="col">
         <div class="dash-sub-card">
-            <span class="dash-sub-lbl">РСС</span>
-            <span class="dash-sub-val" style="color:#2563eb">{{ headcount.grand_rss }}</span>
+            <span class="dash-sub-lbl">{{ cat_name }}</span>
+            <span class="dash-sub-val">{{ cat_count }}</span>
         </div>
     </div>
-    <div class="col-4">
-        <div class="dash-sub-card">
-            <span class="dash-sub-lbl">Рабочие</span>
-            <span class="dash-sub-val" style="color:#16a34a">{{ headcount.grand_workers }}</span>
-        </div>
-    </div>
-    <div class="col-4">
+    {% endfor %}
+    <div class="col">
         <div class="dash-sub-card">
             <span class="dash-sub-lbl">Разница за год</span>
             <span class="dash-sub-val" style="color:{% if movement.total_diff > 0 %}#16a34a{% elif movement.total_diff < 0 %}#dc2626{% else %}var(--text-muted){% endif %}">
@@ -227,12 +223,14 @@
 </script>
 
 <script id="json-headcount" type="application/json">
-[{% for prod in headcount.by_production %}{
-    "name": "{{ prod.name }}",
-    "rss": {{ prod.rss }},
-    "workers": {{ prod.workers }},
-    "total": {{ prod.total }}
-}{% if not forloop.last %},{% endif %}{% endfor %}]
+{
+    "categories": {{ categories_json|safe }},
+    "productions": [{% for prod in headcount.by_production %}{
+        "name": "{{ prod.name }}",
+        "total": {{ prod.total }},
+        "categories": { {% for cat, val in prod.categories.items %}"{{ cat }}": {{ val }}{% if not forloop.last %},{% endif %}{% endfor %} }
+    }{% if not forloop.last %},{% endif %}{% endfor %}]
+}
 </script>
 
 <style>
@@ -601,32 +599,31 @@ const reasonOrder = JSON.parse(document.getElementById('json-reason-order')?.tex
 
 /* График 5: Численность по производствам */
 (function() {
-    const data = JSON.parse(document.getElementById('json-headcount')?.textContent || '[]');
-    if (!data.length) return;
+    const raw = JSON.parse(document.getElementById('json-headcount')?.textContent || '{}');
+    if (!raw.productions || !raw.productions.length) return;
 
     const ctx = document.getElementById('chartHeadcount');
     if (!ctx) return;
 
+    const CAT_COLORS = [
+        'rgba(107,140,174,0.7)','rgba(143,174,107,0.7)','rgba(174,143,107,0.7)',
+        'rgba(107,174,159,0.7)','rgba(159,107,174,0.7)','rgba(174,107,134,0.7)',
+        'rgba(107,162,174,0.7)','rgba(122,158,92,0.7)','rgba(194,149,107,0.7)'
+    ];
+
+    const datasets = raw.categories.map((cat, i) => ({
+        label: cat,
+        data: raw.productions.map(p => p.categories[cat] || 0),
+        backgroundColor: CAT_COLORS[i % CAT_COLORS.length],
+        borderRadius: 4,
+        borderSkipped: false
+    }));
+
     new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: data.map(d => d.name),
-            datasets: [
-                {
-                    label: 'РСС',
-                    data: data.map(d => d.rss),
-                    backgroundColor: 'rgba(37,99,235,0.75)',
-                    borderRadius: 4,
-                    borderSkipped: false
-                },
-                {
-                    label: 'Рабочие',
-                    data: data.map(d => d.workers),
-                    backgroundColor: 'rgba(22,163,74,0.75)',
-                    borderRadius: 4,
-                    borderSkipped: false
-                }
-            ]
+            labels: raw.productions.map(p => p.name),
+            datasets: datasets
         },
         options: {
             responsive: true,
@@ -638,18 +635,8 @@ const reasonOrder = JSON.parse(document.getElementById('json-reason-order')?.tex
                 }
             },
             scales: {
-                x: {
-                    stacked: true,
-                    grid: { display: false },
-                    ticks: { display: false },
-                    title: { display: true, text: 'Производства' }
-                },
-                y: {
-                    stacked: true,
-                    title: { display: true, text: 'Численность, чел.' },
-                    beginAtZero: true,
-                    grid: { color: 'rgba(0,0,0,0.04)' }
-                }
+                x: { stacked: true, grid: { display: false }, ticks: { display: false }, title: { display: true, text: 'Производства' } },
+                y: { stacked: true, title: { display: true, text: 'Численность, чел.' }, beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' } }
             }
         }
     });

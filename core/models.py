@@ -190,6 +190,11 @@ class Employee(models.Model):
                 )
             
     def save(self, *args, **kwargs):
+        # Производство автоматически подтягивается из цеха
+        if self.workshop and self.workshop.production:
+            self.production = self.workshop.production
+        elif self.workshop and not self.workshop.production:
+            self.production = None
         super().save(*args, **kwargs)
 
     class Meta:

@@ -103,10 +103,10 @@ def _redirect_by_role(user):
     Редирект после авторизации в зависимости от роли:
       Суперпользователь        → core:upload_file
       Администратор            → core:upload_file
-      Директор по персоналу   → core:report_headcount
+      Директор по персоналу   → core:dashboard
       Редактор                 → core:upload_file
-      Просмотр                 → core:report_headcount
-      Без группы               → core:report_headcount
+      Просмотр                 → core:dashboard
+      Без группы               → core:dashboard
     """
     if user.is_superuser:
         return redirect('core:upload_file')
@@ -120,7 +120,7 @@ def _redirect_by_role(user):
         return redirect('core:upload_file')
  
     # Директор по персоналу, Просмотр, без группы — на отчёты
-    return redirect('core:report_headcount')
+    return redirect('core:dashboard')
 
 
 # Основные view
@@ -320,9 +320,9 @@ def employee_delete(request, employee_number):
     return render(request, 'core/employee/employee_confirm_delete.html', {'employee': employee})
 
 
-# ---------
+# ==========
 #  Отчёты
-# ---------
+# ==========
 
 @can_view
 def report_headcount(request):
@@ -363,25 +363,20 @@ def report_headcount_export(request):
     ws.title = 'Численность'
 
     # Заголовок
-    ws.append(['Производство', 'Цех', 'Всего', 'РСС', 'Рабочие'])
+    ws.append(['Производство', 'Цех', 'Всего'] + data['categories'])
 
     for prod in data['by_production']:
         for workshop in prod['workshops']:
-            ws.append([
-                prod['name'],
-                f"Цех {workshop.number}",
-                workshop.total,
-                workshop.rss,
-                workshop.workers,
-            ])
-        # Промежуточный итог по производству
-        ws.append([
-            f"Итого {prod['name']}", '',
-            prod['total'], prod['rss'], prod['workers'],
-        ])
+            row = [prod['name'], f"Цех {workshop.number}", workshop.total]
+            row += [workshop.cat_values.get(cat, 0) for cat in data['categories']]
+            ws.append(row)
+        row = [f"Итого {prod['name']}", '', prod['total']]
+        row += [prod['categories'].get(cat, 0) for cat in data['categories']]
+        ws.append(row)
 
-    # Общий итог
-    ws.append(['ИТОГО', '', data['grand_total'], data['grand_rss'], data['grand_workers']])
+    row = ['ИТОГО', '', data['grand_total']]
+    row += [data['grand_categories'].get(cat, 0) for cat in data['categories']]
+    ws.append(row)
 
     # Оформление
     _style_excel_sheet(ws)
@@ -394,7 +389,11 @@ def report_headcount_export(request):
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-    response['Content-Disposition'] = 'attachment; filename="headcount.xlsx"'
+    from datetime import date as _date
+    from urllib.parse import quote
+    today = _date.today()
+    filename = f"Численность_на_{today.strftime('%d.%m.%y')}.xlsx"
+    response['Content-Disposition'] = f"attachment; filename*=UTF-8''{quote(filename)}"
     wb.save(response)
     return response
 
@@ -445,6 +444,8 @@ def report_movement_export(request):
 
     # Лист 1: помесячная динамика
     ws1 = wb.create_sheet('Динамика по месяцам')
+    ws1.append([f'Отчёт за {year} год'])
+    ws1.append([])
     ws1.append(['Месяц', 'Принято', 'Уволено', 'Разница', 'Численность на конец'])
     for row in data['monthly_rows']:
         ws1.append([row['month'], row['hired'], row['dismissed'], row['diff'], row['headcount']])
@@ -452,6 +453,8 @@ def report_movement_export(request):
 
     # Лист 2: текучесть по цехам
     ws2 = wb.create_sheet('Текучесть по цехам')
+    ws2.append([f'Отчёт за {year} год'])
+    ws2.append([])
     ws2.append(['Производство', 'Цех', 'Среднесписочная', 'Принято', 'Уволено', 'Разница', 'Текучесть %'])
     for ws in data['workshop_rows']:
         ws2.append([
@@ -466,6 +469,8 @@ def report_movement_export(request):
 
     # Лист 3: причины увольнений
     ws3 = wb.create_sheet('Причины увольнений')
+    ws3.append([f'Отчёт за {year} год'])
+    ws3.append([])
     ws3.append(['Причина', 'Кол-во', '%'])
     for r in data['reasons_total']:
         ws3.append([r['dismissal_reason__name'], r['count'], r['pct']])
@@ -473,6 +478,8 @@ def report_movement_export(request):
     # Лист 4: матрица цех × причина
     if data['matrix_rows']:
         ws4 = wb.create_sheet('Причины по цехам')
+        ws4.append([f'Отчёт за {year} год'])
+        ws4.append([])
         header = ['Цех', 'Производство'] + data['reason_order'] + ['Итого']
         ws4.append(header)
         for row in data['matrix_rows']:
@@ -491,7 +498,11 @@ def report_movement_export(request):
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-    response['Content-Disposition'] = f'attachment; filename="movement_{year}.xlsx"'
+    from datetime import date as _date
+    from urllib.parse import quote
+    today = _date.today()
+    filename = f"Движение_персонала_на_{today.strftime('%d.%m.%y')}_за_{year}.xlsx"
+    response['Content-Disposition'] = f"attachment; filename*=UTF-8''{quote(filename)}"
     wb.save(response)
     return response
 
@@ -542,6 +553,7 @@ def dashboard(request):
     """Дашборд — сводная аналитика по персоналу."""
     from core.services.report_service import get_headcount_report, get_movement_report
     from datetime import date as _date
+    import json
 
     year_param = request.GET.get('year', '')
     year = int(year_param) if year_param else _date.today().year
@@ -563,6 +575,8 @@ def dashboard(request):
         reverse=True
     )[:10]
 
+    categories_json = json.dumps(headcount['categories'])
+
     return render(request, 'core/reports/dashboard.html', {
         'headcount':       headcount,
         'movement':        movement,
@@ -570,4 +584,5 @@ def dashboard(request):
         'top_workshops':   top_workshops,
         'available_years': movement['available_years'],
         'selected_year':   str(year),
+        'categories_json': categories_json,
     })

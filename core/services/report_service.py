@@ -1,48 +1,38 @@
 from django.db.models import Count, Q
 from django.db.models.functions import TruncMonth
-from core.models import Employee, Workshop
+from core.models import Employee, Workshop, EmployeeCategory
 from datetime import date
 from collections import defaultdict, OrderedDict
 
-CATEGORY_RSS     = 'РСС'
-CATEGORY_WORKERS = 'Рабочие'
-
 
 def get_headcount_report(production_id=None, workshop_id=None):
-    """
-    Отчёт «Численность» — срез на текущий момент (только работающие).
+    # Получаем все категории из БД
+    categories = list(EmployeeCategory.objects.values_list('name', flat=True).order_by('name'))
 
-    Структура: строки = цех, колонки = Всего / РСС / Рабочие.
-    Строки сгруппированы по производству с промежуточными итогами.
-    """
-    # Фильтр активных сотрудников — путь через related name workshop_employees
-    active_q = Q(workshop_employees__dismissal_date__isnull=True)
+    active_filter = Q(workshop_employees__dismissal_date__isnull=True)
     if production_id:
-        active_q &= Q(workshop_employees__production_id=production_id)
-    if workshop_id:
-        active_q &= Q(id=workshop_id)
+        active_filter &= Q(workshop_employees__production_id=production_id)
+
+    annotations = {
+        'total': Count(
+            'workshop_employees',
+            filter=Q(workshop_employees__dismissal_date__isnull=True)
+                   & (Q(workshop_employees__production_id=production_id) if production_id else Q())
+        ),
+    }
+    # Динамически добавляем аннотацию для каждой категории
+    for cat_name in categories:
+        safe_key = f'cat_{cat_name}'  # ключ для аннотации
+        annotations[safe_key] = Count(
+            'workshop_employees',
+            filter=Q(workshop_employees__dismissal_date__isnull=True)
+                   & Q(workshop_employees__employee_category__name=cat_name)
+                   & (Q(workshop_employees__production_id=production_id) if production_id else Q())
+        )
 
     rows = list(
         Workshop.objects
-        .annotate(
-            total=Count(
-                'workshop_employees',
-                filter=Q(workshop_employees__dismissal_date__isnull=True)
-                       & (Q(workshop_employees__production_id=production_id) if production_id else Q())
-            ),
-            rss=Count(
-                'workshop_employees',
-                filter=Q(workshop_employees__dismissal_date__isnull=True)
-                       & Q(workshop_employees__employee_category__name=CATEGORY_RSS)
-                       & (Q(workshop_employees__production_id=production_id) if production_id else Q())
-            ),
-            workers=Count(
-                'workshop_employees',
-                filter=Q(workshop_employees__dismissal_date__isnull=True)
-                       & Q(workshop_employees__employee_category__name=CATEGORY_WORKERS)
-                       & (Q(workshop_employees__production_id=production_id) if production_id else Q())
-            ),
-        )
+        .annotate(**annotations)
         .filter(
             total__gt=0,
             **({'id': workshop_id} if workshop_id else {})
@@ -56,27 +46,31 @@ def get_headcount_report(production_id=None, workshop_id=None):
     for ws in rows:
         prod_name = ws.production.name if ws.production else '—'
         if prod_name not in by_production:
+            cat_totals = {cat: 0 for cat in categories}
             by_production[prod_name] = {
-                'name':      prod_name,
+                'name': prod_name,
                 'workshops': [],
-                'total':     0,
-                'rss':       0,
-                'workers':   0,
+                'total': 0,
+                'categories': cat_totals,
             }
+        # Записываем значения категорий в объект цеха для доступа в шаблоне
+        ws.cat_values = {cat: getattr(ws, f'cat_{cat}', 0) for cat in categories}
         by_production[prod_name]['workshops'].append(ws)
-        by_production[prod_name]['total']   += ws.total
-        by_production[prod_name]['rss']     += ws.rss
-        by_production[prod_name]['workers'] += ws.workers
+        by_production[prod_name]['total'] += ws.total
+        for cat in categories:
+            by_production[prod_name]['categories'][cat] += ws.cat_values.get(cat, 0)
 
-    grand_total   = sum(p['total']   for p in by_production.values())
-    grand_rss     = sum(p['rss']     for p in by_production.values())
-    grand_workers = sum(p['workers'] for p in by_production.values())
+    grand_total = sum(p['total'] for p in by_production.values())
+    grand_categories = {cat: 0 for cat in categories}
+    for p in by_production.values():
+        for cat in categories:
+            grand_categories[cat] += p['categories'][cat]
 
     return {
-        'by_production': list(by_production.values()),
-        'grand_total':   grand_total,
-        'grand_rss':     grand_rss,
-        'grand_workers': grand_workers,
+        'by_production':    list(by_production.values()),
+        'grand_total':      grand_total,
+        'grand_categories': grand_categories,  # {'РСС': 120, 'Рабочие': 340, 'Стажёры': 15, ...}
+        'categories':       categories,        # ['РСС', 'Рабочие', 'Стажёры', ...]
     }
 
 
