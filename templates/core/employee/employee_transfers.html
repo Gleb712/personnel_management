@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block title %}Назначения {{ employee_number }}{% endblock %}
+{% block page_title %}Назначения {{ employee_number }}{% endblock %}
+{% block nav_employees %}active{% endblock %}
+
+{% block content %}
+    <div class="card" style="border-radius:0 10px 10px 10px">
+        <div class="table-container" style="overflow-x:auto">
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th style="text-align:center;width:50px">№ приказа</th>
+                        <th style="text-align:center;min-width:90px">Дата назначения</th>
+                        <th style="text-align:center;min-width:90px">Цех/Отдел до</th>
+                        <th style="text-align:center;width:180px">Должность до</th>
+                        <th style="text-align:center;min-width:90px">Категория/разряд до</th>
+                        <th style="text-align:center;min-width:90px">Цех/Отдел после</th>
+                        <th style="text-align:center;width:180px">Должность после</th>
+                        <th style="text-align:center;min-width:90px">Категория/разряд после</th>
+                    </tr>
+                </thead>
+                <tbody> 
+                    {% for d in data %}
+                        <tr>
+                            <td style="text-align:center;min-width:90px">{{ d.order_number }}</td>
+                            <td style="text-align:center;min-width:90px">{{ d.transfer_date }}</td>
+                            <td style="text-align:center;min-width:90px">{{ d.from_workshop }}</td>
+                            <td style="text-align:center;width:180px">{{ d.from_position }}</td>
+                            <td style="text-align:center;min-width:90px">{{ d.from_grade|default:'-' }}</td>
+                            <td style="text-align:center;min-width:90px">{{ d.to_workshop }}</td>
+                            <td style="text-align:center;width:180px">{{ d.to_position }}</td>
+                            <td style="text-align:center;min-width:90px">{{ d.to_grade|default:'-' }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="10" style="text-align:center;padding:48px;color:var(--text-muted)">
+                                <i class="bi bi-inbox" style="font-size:32px;display:block;margin-bottom:8px"></i>
+                                Назначения не найдены
+                            </td>
+                        </tr>
+                    {% endfor %}                                           
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

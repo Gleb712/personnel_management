@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load core_extras %}
+{% block title %}Табельный учёт{% endblock %}
+{% block page_title %}
+    <div class="col-md-3" style="width: 300px;">
+        <label class="form-label" style="color: white;">Табельный учёт за</label>
+        <input type="date" class="form-control auto-filter" name="ddate"
+                value="{{ data.table_date|date:'Y-m-d' }}" placeholder="{{ data.table_date }}"
+                id="filter-row"
+                hx-get="{% url 'core:report_table' %}"
+                hx-target="#table-wrap"
+                hx-trigger="change from:.auto-filter"
+                hx-include="#filter-row"
+                hx-select="#table-wrap"
+                hx-push-url="true">
+    </div>
+{% endblock %}
+
+{% block content %} 
+    <div class="table-container" style="overflow-x:auto">
+    <div id="table-wrap" class="card" style="border-radius:0 10px 10px 10px">
+        <div class="card" style="border-radius:0 10px 10px 10px">
+                <table class="table mb-0">
+                    <thead>
+                        <tr>
+                            <th rowspan="3">Цех/отдел</th>      
+                            <th rowspan="3">Пр-во</th>         
+                            <th colspan="3">Основные</th> 
+                            <th colspan="3">Вспомогательные</th> 
+                            <th rowspan="3">% ВР к ОР</th>
+                            <th colspan="3">Руководители</th>
+                            <th rowspan="2" colspan="2">Рабочих на рук-ля</th>
+                        </tr>
+                        <tr>
+                            <th>Я</th>
+                            <th colspan="2">с/у и вых</th>
+
+                            <th>Я</th>
+                            <th colspan="2">с/у и вых</th>
+
+                            <th>Я</th>
+                            <th colspan="2">с/у и вых</th>
+                        </tr>
+                        <tr>
+                            <th>чел</th>
+                            <th>чел</th>
+                            <th>час</th>
+
+                            <th>чел</th>
+                            <th>чел</th>
+                            <th>час</th>
+
+                            <th>чел</th>
+                            <th>чел</th>
+                            <th>час</th>
+
+                            <th>чел</th>
+                            <th>час</th>
+                        </tr>
+                    </thead>
+    {% if data.table %}
+                    <tbody>         
+                        {% for t in data.table %}
+                            <tr>
+                                <td>{{ t.dep }}</td>
+                                <td>{{ t.prod }}</td>
+                                <td>{{ t.f_3 }}</td>
+                                <td>{{ t.f_4 }}</td>
+                                <td>{{ t.f_5 }}</td>
+                                <td>{{ t.f_6 }}</td>
+                                <td>{{ t.f_7 }}</td>
+                                <td>{{ t.f_8 }}</td>
+                                <td {% if t.f_9 > 30 %} style="background-color: #f39292;" {% else %} style="background-color: #fff" {% endif %}>{{ t.f_9|floatformat:0 }}%</td>
+                                <td>{{ t.f_10 }}</td>
+                                <td>{{ t.f_11 }}</td>
+                                <td>{{ t.f_12 }}</td>
+                                <td>{{ t.f_13 }}</td>
+                                <td>{{ t.f_14 }}</td>
+                            </tr>
+                        {% endfor %}    
+                            <tr>
+                                <td style="font-weight:800">ИТОГО</td>
+                            </tr>
+                        {% for t in data.summary %}
+                            <tr>
+                                <td style="font-weight:800"></td>
+                                <td style="font-weight:800">{{ t.prod }}</td>
+                                <td style="font-weight:800">{{ t.f_3 }}</td>
+                                <td style="font-weight:800">{{ t.f_4 }}</td>
+                                <td style="font-weight:800">{{ t.f_5 }}</td>
+                                <td style="font-weight:800">{{ t.f_6 }}</td>
+                                <td style="font-weight:800">{{ t.f_7 }}</td>
+                                <td style="font-weight:800">{{ t.f_8 }}</td>
+                                <td {% if t.f_9 > 30 %} style="background-color: #f39292;font-weight:800" {% else %} style="background-color: #fff;font-weight:800" {% endif %}>{{ t.f_9|floatformat:0 }}%</td>
+                                <td style="font-weight:800">{{ t.f_10 }}</td>
+                                <td style="font-weight:800">{{ t.f_11 }}</td>
+                                <td style="font-weight:800">{{ t.f_12 }}</td>
+                                <td style="font-weight:800">{{ t.f_13 }}</td>
+                                <td style="font-weight:800">{{ t.f_14 }}</td>
+                            </tr>
+                        {% endfor %}                                                  
+                    </tbody>
+                </table>
+        </div>
+    </div>
+    {% endif %}
+    </div>        
+    </div>
+
+    <style>
+        .clickable-cell {
+            position: relative;
+        }
+
+        .clickable-cell a {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            text-indent: -9999px;
+            overflow: hidden;
+        }
+
+        .clickable-cell.cell-content {
+            position: relative;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .pg-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 32px;
+            height: 32px;
+            padding: 0 6px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            text-decoration: none;
+            transition: all .15s;
+            user-select: none;
+        }
+
+        .pg-btn:hover {
+            background: var(--surface-3);
+            color: var(--text-primary);
+            border-color: rgba(255,255,255,.12);
+        }
+
+        /* Активная (текущая) страница */
+        .pg-btn.pg-current {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+            cursor: default;
+        }
+        
+        /* Недоступные кнопки (первая/последняя страница) */
+        .pg-btn.pg-disabled {
+            opacity: .3;
+            cursor: default;
+            pointer-events: none;
+        }
+        .pg-ellipsis {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 24px;
+            height: 32px;
+            font-size: 13px;
+            color: var(--text-muted);
+            user-select: none;
+        }
+        .table-container {
+            max-height: 80vh;
+            overflow-y: auto;
+            display: block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        {% comment %} th {
+            position: sticky;
+            top: 0;
+            background: #f0f0f0;
+            z-index: 1;
+        } {% endcomment %}
+        thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+    </style>
+{% endblock %}

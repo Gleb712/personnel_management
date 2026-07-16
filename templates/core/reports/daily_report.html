@@ -1,0 +1,288 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load core_extras %}
+{% block title %}Сведения о приеме и увольнении работников по категориям и производствам за {{data.report_date}}{% endblock %}
+{% block page_title %}Сведения о приеме и увольнении работников по категориям и производствам за {{data.report_date}}{% endblock %}
+
+{% block content %}
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        .cards-grid {
+            max-width: 1280px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            column-gap: 5rem;
+            row-gap: 2rem;
+        }
+
+        .card {
+            background: #ffffff;
+            border-radius: 1.25rem;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.02);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 30px -12px rgba(0, 0, 0, 0.15);
+        }
+
+        .card-header {
+            background: #1e293b;
+            color: white;
+            text-align: center;
+            padding: 0.8rem 1rem;
+            border-bottom: 2px solid #fa7c15;
+            text-transform: uppercase;
+        }
+
+        .card-header h2,
+        .card-header h3 {
+            margin: 0;
+            font-weight: 600;
+            font-size: 1.6rem;
+            letter-spacing: -0.01em;
+            word-break: break-word;
+        }
+
+        .card-header h3 {
+            font-size: 1.45rem;
+        }
+
+        .card-body {
+            padding: 1.6rem, 1.5rem, 2rem, 1.5rem;
+            background: #ffffff;
+            flex: 1;
+        }
+
+        .card-body p {
+            margin: 0 0 1rem 0;
+            color: #0f172a;
+            font-size: 1.2rem;
+            text-align: left;
+            line-height: 0.5;
+        }
+
+        .card-body ul,
+        .card-body ol {
+            text-align: left;
+            padding-left: 1.4rem;
+            margin: 0.75rem 0 0.5rem 0;
+            color: #1e293b;
+            font-weight: 600;
+        }
+
+        .card-body li {
+            margin-left: 2rem;
+            margin-bottom: 0.35rem;
+            font-weight: 300;
+        }
+
+        .card-divider {
+            height: 1px;
+            background: #e2e8f0;
+            margin: 0.75rem 0 1rem 0;
+        }
+
+        .highlight-text {
+            background: #fef9e3;
+            border-left: 4px solid #fa7c15;
+            padding: 0.5rem 1rem;
+            border-radius: 0.75rem;
+            margin-top: 0.75rem;
+            font-size: 0.9rem;
+            text-align: left;
+        }
+
+        @media(max-width: 640px) {
+            .cards-grid {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+
+            .card-header h2, .card-header h3 {
+                font-size: 1.4rem;
+            }
+
+            .card-body {
+                padding: 1.3rem;
+            }
+        }
+
+        @media(min-width: 1400px) {
+            .cards-grid {
+                max-width: 1320px;
+            }
+        }
+        .table tbody tr:hover td { background: white !important; }
+        .table-container {
+            max-height: 80vh;
+            overflow-y: auto;
+            display: block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            background: #f0f0f0;
+            z-index: 1;
+        }
+    </style>
+
+    <div class="cards-grid">
+        <div class="card">
+            <div class="card-header">
+                <h3>Прием за {{data.report_date}}</h3>
+            </div>
+            <div class="card-body">
+                <ul>
+                    Приступило к работе &mdash; {{data.total.hired_total}} чел., в том числе:
+                        <li>РСС &mdash; {{data.total.hired_mss_total}} чел ({{ data.mss_deps_h }}).</li>
+                        <li>Основные рабочие &mdash; {{data.total.hired_dl_total}} чел., в том числе:
+                            <ul>
+                                {% for i in data.hired_employees %}
+                                    {% if i.dl_total != 0 %}
+                                        <li>{{i.production__name}} &mdash; {{i.dl_total}} чел ({{ i.dl_deps }});</li>
+                                    {% endif %}
+                                {% endfor %}
+                            </ul>
+                        </li>
+                        <li>Вспомогательные рабочие &mdash; {{data.total.hired_idl_total}} чел., в том числе:
+                            <ul>
+                                {% for i in data.hired_employees %}
+                                    {% if i.idl_total != 0 %}
+                                        <li>{{i.production__name}} &mdash; {{i.idl_total}} чел ({{ i.idl_deps }});</li>
+                                    {% endif %}
+                                {% endfor %}
+                            </ul>
+                        </li>
+                        {% if data.total.hired_t_total > 0 %}
+                        <li>Ученики &mdash; {{data.total.hired_t_total}} чел., в том числе:
+                            <ul>
+                                {% for i in data.hired_employees %}
+                                    {% if i.t_total != 0 %}
+                                        <li>{{i.production__name}} &mdash; {{i.t_total}} чел ({{ i.t_deps }});</li>
+                                    {% endif %}
+                                {% endfor %}
+                            </ul>
+                        </li>
+                        {% endif %}
+                </ul>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>Уволено за {{data.report_date}}</h3>
+            </div>
+            <div class="card-body">
+                <ul>
+                    Уволено из Общества &mdash; {{data.total.dismissed_total}} чел., в том числе:
+                        <li>РСС &mdash; {{data.total.dismissed_mss_total}} чел. ({{ data.mss_deps_d }})</li>
+                        <li>Основные рабочие &mdash; {{data.total.dismissed_dl_total}} чел., в том числе:
+                            <ul>
+                                {% for i in data.dismissed_employees %}
+                                    {% if i.dl_total != 0 %}
+                                        <li>{{i.production__name}} &mdash; {{i.dl_total}} чел ({{ i.dl_deps }});</li>
+                                    {% endif %}
+                                {% endfor %}
+                            </ul>
+                        </li>
+                        <li>Вспомогательные рабочие &mdash; {{data.total.dismissed_idl_total}} чел., в том числе:
+                            <ul>
+                                {% for i in data.dismissed_employees %}
+                                    {% if i.idl_total != 0 %}
+                                        <li>{{i.production__name}} &mdash; {{i.idl_total}} чел ({{ i.idl_deps }});</li>
+                                    {% endif %}
+                                {% endfor %}
+                            </ul>
+                        </li>
+                      {% if data.total.dismissed_t_total > 0 %}
+                        <li>Ученики &mdash; {{data.total.dismissed_t_total}} чел., в том числе:
+                            <ul>
+                                {% for i in data.dismissed_employees %}
+                                    {% if i.t_total != 0 %}
+                                        <li>{{i.production__name}} &mdash; {{i.t_total}} чел ({{ i.t_deps }});</li>
+                                    {% endif %}
+                                {% endfor %}
+                            </ul>
+                        </li>
+                        {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <h3>Оперативное движение персонала за {{ data.month_passed }} {{data.year}} года.</h3>
+        </div>
+        <div class="card-body">
+            <div class="table-container">
+                <table class="table mb-0">
+                    <thead>
+                        <tr>
+                            <th colspan="3" style="text-align:center">Производство/Категория</th>
+                            {% for cat in data.transfers.cats %}
+                                <th style="text-align:center">{{ cat }}</th>
+                            {% endfor %}
+                            <th style="text-align:center">ВСЕГО</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in data.transfers.table %}
+                        <tr>
+                            <td rowspan="4" style="width: 90px;">{{ row.production }}</td>
+                            <td rowspan="2" style="width: 90px;">Прибыло</td>
+                            <td style="width: 90px;">Прием</td>
+                            {% for cell in row.categories %}
+                                <td style="text-align:center">{{ cell.hired }}</td>
+                            {% endfor %}
+                        </tr>
+                        <tr>
+                            <td style="width: 90px;">Перевод</td>
+                            {% for cell in row.categories %}
+                                <td style="text-align:center">{{ cell.arrived }}</td>
+                            {% endfor %}
+                        </tr>
+                        <tr>
+                            <td rowspan="2">Убыло</td>
+                            <td style="width: 90px;">Уволено</td>
+                            {% for cell in row.categories %}
+                                <td style="text-align:center">{{ cell.dismissed }}</td>
+                            {% endfor %}
+                        </tr>
+                        <tr>
+                            <td style="width: 90px;">Перевод</td>
+                            {% for cell in row.categories %}
+                                <td style="text-align:center">{{ cell.departed }}</td>
+                            {% endfor %}
+                        </tr>
+                        <tr>
+                            <td colspan="3" style="text-align:center;font-weight: 800;">БАЛАНС</td>
+                            {% for cell in row.categories %}
+                                <td style="text-align:center;font-weight: 600;{% if cell.balance > 0 %}color:#16a34a{% elif cell.balance < 0 %}color:#dc2626{% endif %}">
+                                    {% if cell.balance > 0 %}+{% endif %}{{ cell.balance }}
+                                </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}

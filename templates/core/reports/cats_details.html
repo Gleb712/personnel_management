@@ -1,0 +1,222 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load core_extras %}
+{% block title %}{{ cat_name }}{% endblock %}
+{% block page_title %}{{ cat_name }}{% endblock %}
+
+{% block content %}
+    <div class="card" style="border-radius:0 10px 10px 10px">
+        <div style="overflow-x:auto">
+            <div class="table-container">
+                <table class="table mb-0">
+                    <thead>
+                        <tr>
+                            <th style="text-align:center;min-width:90px">Таб. №</th>
+                            <th style="text-align:center;min-width:90px">ФИО</th>
+                            <th style="text-align:center;min-width:90px">Дата рождения</th> 
+                            <th style="text-align:center;width:90px">Цех</th>
+                            <th style="text-align:center;width:180px">Должность</th>
+                            <th style="text-align:center;min-width:90px">Разряд/Категория</th>  
+                            <th style="text-align:center;min-width:90px">Дата приема</th>  
+                            <th style="text-align:center;min-width:90px">Откуда работник</th> 
+                            <th style="text-align:center;min-width:90px">Стаж</th>  
+                        </tr>
+                    </thead> 
+                        {% if data %}
+                            {% for d in data %}
+                                <tr>
+                                    <td style="text-align:center;font-weight:600">{{ d.employee_number }}</td>
+                                    <td class="clickable-cell" style="font-weight:300">
+                                        <div class="cell-content">{{ d.full_name }}</div>
+                                        <a href="{% url 'core:employee_detail' employee_number=d.employee_number %}"></a>
+                                    </td>  
+                                    <td style="text-align:center;font-weight:300">{{ d.birth_date }}</td>   
+                                    <td style="text-align:center;font-weight:300">{{ d.workshop }}</td> 
+                                    <td style="font-weight:300">{{ d.position }}</td>
+                                    <td style="text-align:center;font-weight:300">{{ d.grade|default:'-' }}</td>
+                                    <td style="text-align:center;font-weight:300">{{ d.hire_date }}</td>
+                                    <td style="text-align:center;font-weight:300">{{ d.hire_source }}</td>
+                                    <td style="text-align:center;font-weight:300">{{ d.expirence }}</td>
+                                </tr>
+                            {% endfor %}
+                        {% endif %}
+                    <tbody>                               
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% if data.has_other_pages %}
+    <!-- Подвал пагинации: слева — инфо о диапазоне, справа — кнопки навигации -->
+    <div style="padding:12px 18px;border-top:1px solid var(--border);
+                display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+
+        <!-- Показано X–Y из Z -->
+        <span style="font-size:12px;color:var(--text-muted)">
+            Показано
+            <strong style="color:var(--text-secondary)">{{ data.start_index }}–{{ data.end_index }}</strong>
+            из <strong style="color:var(--text-secondary)">{{ total_count }}</strong>
+        </span>
+
+        <!-- Кнопки пагинации -->
+        <nav style="display:flex;align-items:center;gap:4px;">
+
+            <!-- В начало + предыдущая -->
+            {% if data.has_previous %}
+            <a class="pg-btn" title="Первая страница"
+               href="?page=1">
+                <i class="bi bi-chevron-double-left"></i>
+            </a>
+            <a class="pg-btn" title="Предыдущая"
+               href="?page={{ data.previos_page_number}}">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+            {% else %}
+            <span class="pg-btn pg-disabled"><i class="bi bi-chevron-double-left"></i></span>
+            <span class="pg-btn pg-disabled"><i class="bi bi-chevron-left"></i></span>
+            {% endif %}
+
+            <!-- Номера страниц: всегда первая + окно ±2 вокруг текущей + всегда последняя -->
+            <!-- Между ними многоточие, если есть разрыв -->
+            {% with cur=data.number total=data.paginator.num_pages %}
+
+                {% if cur > 3 %}
+                <a class="pg-btn"
+                   href="?page=1">1</a>
+                {% endif %}
+
+                {% if cur > 4 %}
+                <span class="pg-ellipsis">…</span>
+                {% endif %}
+
+                {% for p in data.paginator.page_range %}
+                    {% if p >= cur|add:"-2" and p <= cur|add:"2" %}
+                        {% if p == cur %}
+                        <span class="pg-btn pg-current">{{ p }}</span>
+                        {% else %}
+                        <a class="pg-btn"
+                           href="?page={{ p }}">{{ p }}</a>
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+
+                {% if cur < total|add:"-3" %}
+                <span class="pg-ellipsis">…</span>
+                {% endif %}
+
+                {% if cur < total|add:"-2" %}
+                <a class="pg-btn"
+                   href="?page={{ total }}">{{ total }}</a>
+                {% endif %}
+
+            {% endwith %}
+
+            <!-- Следующая + в конец -->
+            {% if data.has_next %}
+            <a class="pg-btn" title="Следующая"
+               href="?page={{ data.next_page_number }}">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            <a class="pg-btn" title="Последняя страница"
+               href="?page={{ data.paginator.num_pages }}">
+                <i class="bi bi-chevron-double-right"></i>
+            </a>
+            {% else %}
+            <span class="pg-btn pg-disabled"><i class="bi bi-chevron-right"></i></span>
+            <span class="pg-btn pg-disabled"><i class="bi bi-chevron-double-right"></i></span>
+            {% endif %}
+
+        </nav>
+    </div>
+    {% endif %}
+    </div>
+
+<style>
+    .clickable-cell {
+        position: relative;
+    }
+
+    .clickable-cell a {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        text-indent: -9999px;
+        overflow: hidden;
+    }
+
+    .clickable-cell.cell-content {
+        position: relative;
+        z-index: 1;
+        pointer-events: none;
+    }
+
+    .pg-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 32px;
+        height: 32px;
+        padding: 0 6px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        text-decoration: none;
+        transition: all .15s;
+        user-select: none;
+    }
+
+    .pg-btn:hover {
+        background: var(--surface-3);
+        color: var(--text-primary);
+        border-color: rgba(255,255,255,.12);
+    }
+
+    /* Активная (текущая) страница */
+    .pg-btn.pg-current {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+        cursor: default;
+    }
+    
+    /* Недоступные кнопки (первая/последняя страница) */
+    .pg-btn.pg-disabled {
+        opacity: .3;
+        cursor: default;
+        pointer-events: none;
+    }
+    .pg-ellipsis {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 24px;
+        height: 32px;
+        font-size: 13px;
+        color: var(--text-muted);
+        user-select: none;
+    }
+    .table-container {
+        max-height: 80vh;
+        overflow-y: auto;
+        display: block;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th {
+        position: sticky;
+        top: 0;
+        background: #f0f0f0;
+        z-index: 1;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load core_extras %}
+{% block title %}{{ data.details_type }} за {{ data.details_date }}{% endblock %}
+{% block page_title %}
+    <div class="col-md-3" style="width: 300px;">
+        <label class="form-label" style="color: white;">{{ data.details_type }} за</label>
+        <input type="date" class="form-control auto-filter" name="ddate"
+                value="{{ data.details_date|date:'Y-m-d' }}" placeholder="{{ data.details_date }}"
+                id="filter-row"
+                hx-get="{% url 'core:dashboard_details' data.dtype_num %}"
+                hx-target="#table-wrap"
+                hx-trigger="change from:.auto-filter"
+                hx-include="#filter-row"
+                hx-select="#table-wrap"
+                hx-push-url="true">
+    </div>
+{% endblock %}
+
+{% block content %}
+    {% if data.reasons_stats %} 
+        <div id="table-wrap" class="card" style="border-radius:0 10px 10px 10px">
+            <div style="overflow-x:auto">
+                <table id="reasons_table" class="table mb-0">
+                    <thead>
+                        <tr>
+                            {% if data.dtype_num == 0 or data.dtype_num == 3 %}
+                            <th>Источник приема</th>
+                            {% elif data.dtype_num == 1 or data.dtype_num == 4 %}
+                            <th>Причина увольнения</th>
+                            {% endif %}
+                            <th style="text-align:center;min-width:90px">за {{ data.details_date }}</th>
+                            <th style="text-align:center;min-width:70px">%</th>
+                            <th style="text-align:center;min-width:90px">с {{ data.month_start }}</th>
+                            <th style="text-align:center;min-width:70px">%</th>                 
+                            <th style="text-align:center;min-width:90px">с {{ data.year_start }}</th>
+                            <th style="text-align:center;min-width:70px">%</th>                                           
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in data.reasons_stats %}
+                            <tr>
+                                {% if r.today_count or r.month_count or r.year_count != 0 %}
+                                    <td style="font-weight:500">{{ r.reason_group }}</td>         
+                                    <td class="clickable-cell" style="text-align:center;font-weight:600">
+                                        <div class="cell-content">{{ r.today_count }}</div>
+                                        <a href="
+                                            {% if data.dtype_num == 0 %}
+                                                {% url 'core:reason_details' reason_id=r.hire_source_id action='hire' period='day' employee_type='regular' details_date=data.details_date %}
+                                            {% elif data.dtype_num == 1 %}
+                                                {% url 'core:reason_details' reason_id=r.dismissal_reason_id action='dismissal' period='day' employee_type='regular' details_date=data.details_date %}
+                                            {% elif data.dtype_num == 3 %}
+                                                {% url 'core:reason_details' reason_id=r.hire_source_id action='hire' period='day' employee_type='trainee' details_date=data.details_date %}
+                                            {% elif data.dtype_num == 4 %}
+                                                {% url 'core:reason_details' reason_id=r.dismissal_reason_id action='dismissal' period='day' employee_type='trainee' details_date=data.details_date %}
+                                            {% endif %}"
+                                            class="text-decoration-none">
+                                        </a>
+                                    </td>     
+                                    <td style="text-align:center;font-weight:600">{{ r.today_percent }}%</td>     
+                                    <td class="clickable-cell" style="text-align:center;font-weight:600">
+                                        <div class="cell-content">{{ r.month_count }}</div>
+                                        <a href="                                            
+                                            {% if data.dtype_num == 0 %}
+                                                {% url 'core:reason_details' reason_id=r.hire_source_id action='hire' period='month' employee_type='regular' details_date=data.details_date %}
+                                            {% elif data.dtype_num == 1 %}
+                                                {% url 'core:reason_details' reason_id=r.dismissal_reason_id action='dismissal' period='month' employee_type='regular' details_date=data.details_date %}
+                                            {% elif data.dtype_num == 3 %}
+                                                {% url 'core:reason_details' reason_id=r.hire_source_id action='hire' period='month' employee_type='trainee' details_date=data.details_date %}
+                                            {% elif data.dtype_num == 4 %}
+                                                {% url 'core:reason_details' reason_id=r.dismissal_reason_id action='dismissal' period='month' employee_type='trainee' details_date=data.details_date %}
+                                            {% endif %}"
+                                            class="text-decoration-none">
+                                        </a>
+                                    </td>     
+                                    <td style="text-align:center;font-weight:600">{{ r.month_percent }}%</td>    
+                                    <td class="clickable-cell" style="text-align:center;font-weight:600">
+                                        <div class="cell-content">{{ r.year_count }}</div>
+                                        <a href="                                            
+                                            {% if data.dtype_num == 0 %}
+                                                {% url 'core:reason_details' reason_id=r.hire_source_id action='hire' period='year' employee_type='regular' details_date=data.details_date %}
+                                            {% elif data.dtype_num == 1 %}
+                                                {% url 'core:reason_details' reason_id=r.dismissal_reason_id action='dismissal' period='year' employee_type='regular' details_date=data.details_date %}
+                                            {% elif data.dtype_num == 3 %}
+                                                {% url 'core:reason_details' reason_id=r.hire_source_id action='hire' period='year' employee_type='trainee' details_date=data.details_date %}
+                                            {% elif data.dtype_num == 4 %}
+                                                {% url 'core:reason_details' reason_id=r.dismissal_reason_id action='dismissal' period='year' employee_type='trainee' details_date=data.details_date %}
+                                            {% endif %}"
+                                            class="text-decoration-none">
+                                        </a>
+                                    </td>          
+                                    <td style="text-align:center;font-weight:600">{{ r.year_percent }}%</td>   
+                                {% endif %}                                                                                                             
+                            </tr>
+                        {% endfor %}
+                        <tr>
+                            <td style="font-weight:800">ИТОГО</td>
+                            <td class="clickable-cell" style="text-align:center;font-weight:600">
+                                <div class="cell-content">{{ data.total_today }}</div>
+                                <a href="
+                                    {% if data.dtype_num == 0 %}
+                                        {% url 'core:reason_details' reason_id=0 action='hire' period='day' employee_type='regular' details_date=data.details_date %}
+                                    {% elif data.dtype_num == 1 %}
+                                        {% url 'core:reason_details' reason_id=0 action='dismissal' period='day' employee_type='regular' details_date=data.details_date %}
+                                    {% elif data.dtype_num == 3 %}
+                                        {% url 'core:reason_details' reason_id=0 action='hire' period='day' employee_type='trainee' details_date=data.details_date %}
+                                    {% elif data.dtype_num == 4 %}
+                                        {% url 'core:reason_details' reason_id=0 action='dismissal' period='day' employee_type='trainee' details_date=data.details_date %}
+                                    {% endif %}"
+                                    class="text-decoration-none">
+                                </a>
+                            </td>                      
+                            <td style="text-align:center;font-weight:600"> - </td>               
+                            <td class="clickable-cell" style="text-align:center;font-weight:600">
+                                <div class="cell-content">{{ data.total_month }}</div>
+                                <a href="
+                                    {% if data.dtype_num == 0 %}
+                                        {% url 'core:reason_details' reason_id=0 action='hire' period='month' employee_type='regular' details_date=data.details_date %}
+                                    {% elif data.dtype_num == 1 %}
+                                        {% url 'core:reason_details' reason_id=0 action='dismissal' period='month' employee_type='regular' details_date=data.details_date %}
+                                    {% elif data.dtype_num == 3 %}
+                                        {% url 'core:reason_details' reason_id=0 action='hire' period='month' employee_type='trainee' details_date=data.details_date %}
+                                    {% elif data.dtype_num == 4 %}
+                                        {% url 'core:reason_details' reason_id=0 action='dismissal' period='month' employee_type='trainee' details_date=data.details_date %}
+                                    {% endif %}"
+                                    class="text-decoration-none">
+                                </a>
+                            </td>   
+                            <td style="text-align:center;font-weight:600"> - </td>        
+                            <td class="clickable-cell" style="text-align:center;font-weight:600">
+                                <div class="cell-content">{{ data.total_year }}</div>
+                                <a href="
+                                    {% if data.dtype_num == 0 %}
+                                        {% url 'core:reason_details' action='hire' period='year' employee_type='regular' details_date=data.details_date %}
+                                    {% elif data.dtype_num == 1 %}
+                                        {% url 'core:reason_details' action='dismissal' period='year' employee_type='regular' details_date=data.details_date %}
+                                    {% elif data.dtype_num == 3 %}
+                                        {% url 'core:reason_details' action='hire' period='year' employee_type='trainee' details_date=data.details_date %}
+                                    {% elif data.dtype_num == 4 %}
+                                        {% url 'core:reason_details' action='dismissal' period='year' employee_type='trainee' details_date=data.details_date %}
+                                    {% endif %}"
+                                    class="text-decoration-none">
+                                </a>
+                            </td>          
+                            <td style="text-align:center;font-weight:600"> - </td>                                                                         
+                        </tr>   
+                        {% if data.dtype_num == 1 %}
+                        <tr>
+                            <td style="font-weight:500">из них со стажем до 1 года</td>             
+                            <td class="clickable-cell" style="text-align:center;font-weight:600">
+                                <div class="cell-content">{{ data.less_year_stats.less_year_today }}</div>
+                                <a href="
+                                    {% url 'core:reason_details' action='dismissal' period='day' employee_type='probation' details_date=data.details_date %}"
+                                    class="text-decoration-none">
+                                </a>
+                            </td>         
+                            <td style="text-align:center;font-weight:600">{{ data.less_year_stats.less_year_today_percent }}%</td>       
+                            <td class="clickable-cell" style="text-align:center;font-weight:600">
+                                <div class="cell-content">{{ data.less_year_stats.less_year_month }}</div>
+                                <a href="
+                                    {% url 'core:reason_details' action='dismissal' period='month' employee_type='probation' details_date=data.details_date %}"
+                                    class="text-decoration-none">
+                                </a>
+                            </td>              
+                            <td style="text-align:center;font-weight:600">{{ data.less_year_stats.less_year_month_percent }}%</td>        
+                            <td class="clickable-cell" style="text-align:center;font-weight:600">
+                                <div class="cell-content">{{ data.less_year_stats.less_year_year }}</div>
+                                <a href="
+                                    {% url 'core:reason_details' action='dismissal' period='year' employee_type='probation' details_date=data.details_date %}"
+                                    class="text-decoration-none">
+                                </a>
+                            </td>         
+                            <td style="text-align:center;font-weight:600">{{ data.less_year_stats.less_year_year_percent }}%</td>                                                                         
+                        </tr>
+                        {% endif %}                                              
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
+    <style>
+        .clickable-cell {
+            position: relative;
+        }
+
+        .clickable-cell a {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            text-indent: -9999px;
+            overflow: hidden;
+        }
+
+        .clickable-cell.cell-content {
+            position: relative;
+            z-index: 1;
+            pointer-events: none;
+        }
+    </style>
+{% endblock %}

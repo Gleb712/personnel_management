@@ -1,0 +1,310 @@
+<div class="card">
+    <div class="card-header justify-content-between">
+        <span>
+            <i class="bi bi-table" style="color:var(--accent)"></i>
+            Найдено: <strong>{{ total_count }}</strong>
+        </span>
+        <span class="htmx-indicator spinner-border spinner-border-sm" style="color:var(--accent)"></span>
+        <a href="#" 
+        id="export-excel-btn"
+        class="btn btn-success btn-sm"
+        title="Выгрузить в Excel">
+            <i class="bi bi-file-earmark-excel me-1"></i>Выгрузка в Excel
+        </a>
+        <div id="export-loading" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:9999; background:white; padding:20px; border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,0.15); text-align:center;">
+            <div class="spinner-border text-primary mb-2" role="status"></div>
+            <div>Формирование Excel файла...</div>
+        </div>
+        <script>
+            document.getElementById('export-excel-btn').onclick = function(e) {
+                e.preventDefault();
+                
+                // Показать индикатор
+                const loading = document.getElementById('export-loading');
+
+                if (!loading) {
+                    console.log('Loading element not found');
+                    return;
+                }
+
+                loading.style.display = 'block';
+                
+                // Собрать фильтры
+                const params = new URLSearchParams();
+                const fields = ['search', 'position', 'category', 'production', 'workshop', 'status', 'gender', 'age_from', 'age_to', 'tenure_from', 'tenure_to', 'per_page'];
+                
+                fields.forEach(field => {
+                    const el = document.querySelector(`[name="${field}"]`);
+                    if (el && el.value) params.append(field, el.value);
+                });
+                
+                // Используем fetch чтобы дождаться реального ответа
+                const url = `{% url 'core:export_employees_excel' %}?${params.toString()}`;
+                
+                fetch(url)
+                    .then(response => {
+                        // Получаем blob из response
+                        return response.blob().then(blob => ({ blob, response }));
+                    })
+                    .then(({ blob, response }) => {
+                        // Файл получен, создаем ссылку для скачивания
+                        const blobUrl = window.URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = blobUrl;
+                        
+                        // Получаем имя файла из заголовка
+                        {% comment %} const contentDisposition = response.headers.get('Content-Disposition'); {% endcomment %}
+                        let filename = 'employees.xlsx';
+                        {% comment %} if (contentDisposition) {
+                            const match = contentDisposition.match(/filename="?(.+)"?/);
+                            if (match) filename = match[1];
+                        } {% endcomment %}
+                        link.download = filename;
+                        
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        
+                        // Очищаем и скрываем индикатор
+                        window.URL.revokeObjectURL(blobUrl);
+                        loading.style.display = 'none';
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        loading.style.display = 'none';
+                        alert('Ошибка при выгрузке');
+                    });
+            };
+        </script>
+    </div>
+    <div style="overflow-x:auto">
+        <div class="table-container">
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th>Таб. №</th>
+                        <th>ФИО</th>
+                        <th>Пол</th>
+                        <th>Дата рождения</th>
+                        <th>Возраст</th>
+                        <th>Принят</th>
+                        <th>Стаж</th>
+                        <th>Уволен</th>
+                        <th>Производство</th>
+                        <th>Цех</th>
+                        <th>Должность</th>
+                        <th>Статус</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in page_obj %}
+                    <tr style="cursor:pointer" onclick="window.location='{% url 'core:employee_detail' e.employee_number %}'">
+                        <td><code>{{ e.employee_number }}</code></td>
+                        <td style="font-weight:500;color:var(--text-primary)">{{ e.full_name }}</td>
+
+                        <!-- Пол — иконка + текст -->
+                        <td>
+                            {% if e.gender == 'Мужской' %}
+                                <span style="color:var(--text-secondary)">Мужской</span>
+                            {% elif e.gender == 'Женский' %}
+                                <span style="color:var(--text-secondary)">Женский</span>
+                            {% else %}
+                                <span style="color:var(--text-muted)">—</span>
+                            {% endif %}
+                        </td>
+
+                        <td>{{ e.birth_date|date:"d.m.Y"|default:"—" }}</td>
+
+                        <!-- Возраст — аннотированное поле из ORM -->
+                        <td style="color:var(--text-secondary)">
+                            {% if e.age is not None %}
+                                {{ e.age }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+
+                        <td>{{ e.hire_date|date:"d.m.Y" }}</td>
+
+                        <!-- Стаж — аннотированное поле из ORM -->
+                        <td style="color:var(--text-secondary)">
+                            {% if e.expirence is not None %}
+                                {{ e.expirence }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+
+                        <td>{{ e.dismissal_date|date:"d.m.Y"|default:"—" }}</td>
+                        <td style="color:var(--text-secondary)">{{ e.production|default:"—" }}</td>
+                        <td style="color:var(--text-secondary)">{{ e.workshop|default:"—" }}</td>
+                        <td style="color:var(--text-secondary)">{{ e.position|default:"—" }}</td>
+                        <td>
+                            {% if e.dismissal_date %}
+                                <span class="badge-dismissed">Уволен</span>
+                            {% else %}
+                                <span class="badge-active">Работает</span>
+                            {% endif %}
+                        </td>
+                        <td onclick="event.stopPropagation()">
+                            <a href="{% url 'core:employee_detail' e.employee_number %}"
+                               class="btn btn-sm btn-outline-secondary" title="Просмотр">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="13" style="text-align:center;padding:48px;color:var(--text-muted)">
+                            <i class="bi bi-inbox" style="font-size:32px;display:block;margin-bottom:8px"></i>
+                            Сотрудники не найдены
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div style="padding:12px 18px;border-top:1px solid var(--border);
+                display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+
+        <span style="font-size:12px;color:var(--text-muted)">
+            Показано
+            <strong style="color:var(--text-secondary)">{{ page_obj.start_index }}–{{ page_obj.end_index }}</strong>
+            из <strong style="color:var(--text-secondary)">{{ total_count }}</strong>
+        </span>
+
+        <nav style="display:flex;align-items:center;gap:4px;">
+
+            {% if page_obj.has_previous %}
+            <a class="pg-btn" title="Первая страница"
+               href="?page=1&search={{ search }}&position={{ position }}&production={{ selected_production }}&workshop={{ selected_workshop }}&status={{ selected_status }}&per_page={{ per_page }}&gender={{ gender }}&age_from={{ age_from }}&age_to={{ age_to }}&tenure_from={{ tenure_from }}&tenure_to={{ tenure_to }}">
+                <i class="bi bi-chevron-double-left"></i>
+            </a>
+            <a class="pg-btn" title="Предыдущая"
+               href="?page={{ page_obj.previous_page_number }}&search={{ search }}&position={{ position }}&production={{ selected_production }}&workshop={{ selected_workshop }}&status={{ selected_status }}&per_page={{ per_page }}&gender={{ gender }}&age_from={{ age_from }}&age_to={{ age_to }}&tenure_from={{ tenure_from }}&tenure_to={{ tenure_to }}">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+            {% else %}
+            <span class="pg-btn pg-disabled"><i class="bi bi-chevron-double-left"></i></span>
+            <span class="pg-btn pg-disabled"><i class="bi bi-chevron-left"></i></span>
+            {% endif %}
+
+            {% with cur=page_obj.number total=page_obj.paginator.num_pages %}
+
+                {% if cur > 3 %}
+                <a class="pg-btn"
+                   href="?page=1&search={{ search }}&position={{ position }}&production={{ selected_production }}&workshop={{ selected_workshop }}&status={{ selected_status }}&per_page={{ per_page }}&gender={{ gender }}&age_from={{ age_from }}&age_to={{ age_to }}&tenure_from={{ tenure_from }}&tenure_to={{ tenure_to }}">1</a>
+                {% endif %}
+
+                {% if cur > 4 %}
+                <span class="pg-ellipsis">…</span>
+                {% endif %}
+
+                {% for p in page_obj.paginator.page_range %}
+                    {% if p >= cur|add:"-2" and p <= cur|add:"2" %}
+                        {% if p == cur %}
+                        <span class="pg-btn pg-current">{{ p }}</span>
+                        {% else %}
+                        <a class="pg-btn"
+                           href="?page={{ p }}&search={{ search }}&position={{ position }}&production={{ selected_production }}&workshop={{ selected_workshop }}&status={{ selected_status }}&per_page={{ per_page }}&gender={{ gender }}&age_from={{ age_from }}&age_to={{ age_to }}&tenure_from={{ tenure_from }}&tenure_to={{ tenure_to }}">{{ p }}</a>
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+
+                {% if cur < total|add:"-3" %}
+                <span class="pg-ellipsis">…</span>
+                {% endif %}
+
+                {% if cur < total|add:"-2" %}
+                <a class="pg-btn"
+                   href="?page={{ total }}&search={{ search }}&position={{ position }}&production={{ selected_production }}&workshop={{ selected_workshop }}&status={{ selected_status }}&per_page={{ per_page }}&gender={{ gender }}&age_from={{ age_from }}&age_to={{ age_to }}&tenure_from={{ tenure_from }}&tenure_to={{ tenure_to }}">{{ total }}</a>
+                {% endif %}
+
+            {% endwith %}
+
+            {% if page_obj.has_next %}
+            <a class="pg-btn" title="Следующая"
+               href="?page={{ page_obj.next_page_number }}&search={{ search }}&position={{ position }}&production={{ selected_production }}&workshop={{ selected_workshop }}&status={{ selected_status }}&per_page={{ per_page }}&gender={{ gender }}&age_from={{ age_from }}&age_to={{ age_to }}&tenure_from={{ tenure_from }}&tenure_to={{ tenure_to }}">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            <a class="pg-btn" title="Последняя страница"
+               href="?page={{ page_obj.paginator.num_pages }}&search={{ search }}&position={{ position }}&production={{ selected_production }}&workshop={{ selected_workshop }}&status={{ selected_status }}&per_page={{ per_page }}&gender={{ gender }}&age_from={{ age_from }}&age_to={{ age_to }}&tenure_from={{ tenure_from }}&tenure_to={{ tenure_to }}">
+                <i class="bi bi-chevron-double-right"></i>
+            </a>
+            {% else %}
+            <span class="pg-btn pg-disabled"><i class="bi bi-chevron-right"></i></span>
+            <span class="pg-btn pg-disabled"><i class="bi bi-chevron-double-right"></i></span>
+            {% endif %}
+
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.pg-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 6px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    text-decoration: none;
+    transition: all .15s;
+    user-select: none;
+}
+.pg-btn:hover {
+    background: var(--surface-3);
+    color: var(--text-primary);
+    border-color: rgba(255,255,255,.12);
+}
+.pg-btn.pg-current {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    cursor: default;
+}
+.pg-btn.pg-disabled {
+    opacity: .3;
+    cursor: default;
+    pointer-events: none;
+}
+.pg-ellipsis {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 32px;
+    font-size: 13px;
+    color: var(--text-muted);
+    user-select: none;
+}
+
+.table-container {
+    max-height: 500px;
+    overflow-y: auto;
+    display: block;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th {
+    position: sticky;
+    top: 0;
+    background: #f0f0f0;
+    z-index: 1;
+}
+</style>

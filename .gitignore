@@ -3,6 +3,7 @@
 /.vscode
 /.env
 /create_table.py
+/generate_employees.py
 /main.py
 *.csv
 *.xlsx
@@ -12,3 +13,6 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.md
+*.sh
+*.txt

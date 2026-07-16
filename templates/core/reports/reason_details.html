@@ -1,0 +1,259 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load core_extras %}
+{% block title %}Причина: {{data.reason}}{% endblock %}
+{% block page_title %} Причина: {{data.reason}}{% endblock %}
+
+{% block content %} 
+        <div class="card" style="border-radius:0 10px 10px 10px">
+            <div class="table-container" style="overflow-x:auto">
+                <table class="table mb-0">
+                    <thead>
+                        {% if data.action_type == 'hiring' %}
+                            <tr>
+                                <th style="text-align:center;width:50px">№ П/П</th>  
+                                <th style="text-align:center;width:90px">Цех</th>
+                                <th style="text-align:center;min-width:90px">ФИО</th>
+                                <th style="text-align:center;min-width:90px">Таб. №</th>
+                                <th style="text-align:center;width:180px">Должность</th>
+                                <th style="text-align:center;min-width:90px">Разряд/Категория</th>  
+                                <th style="text-align:center;min-width:90px">Дата приема</th>
+                                <th style="text-align:center;min-width:90px">Дата рождения</th>   
+                                <th style="text-align:center;min-width:90px">Откуда работник</th> 
+                                <th style="text-align:center;min-width:90px">Категория персонала</th>                             
+                            </tr>
+                        {% elif data.action_type == 'dismissal' %}
+                            <tr>
+                                <th style="text-align:center;width:50px">№ П/П</th>  
+                                <th style="text-align:center;min-width:90px">ФИО</th>
+                                <th style="text-align:center;width:90px">Цех</th>
+                                <th style="text-align:center;min-width:90px">Таб. №</th>
+                                <th style="text-align:center;width:180px">Должность</th>
+                                <th style="text-align:center;min-width:90px">Категория персонала</th>
+                                <th style="text-align:center;min-width:90px">Разряд/Категория</th>
+                                <th style="text-align:center;min-width:90px">Дата рождения</th>     
+                                <th style="text-align:center;min-width:90px">Дата приема</th>
+                                <th style="text-align:center;min-width:90px">Дата увольнения</th>  
+                                <th style="text-align:center;min-width:90px">Дата приказа</th>
+                                <th style="text-align:center;min-width:90px">Стаж</th>                            
+                            </tr>
+                        {% endif %}
+                    </thead>
+    {% if data.reason_details %}
+                    <tbody>  
+                        {% for r in page_obj %}
+                            {% if data.action_type == 'hiring' %}
+                                <tr>      
+                                    <td style="text-align:center;font-weight:500">{{ r.row_number }}</td>
+                                    <td style="text-align:center;font-weight:300">{{ r.employee.workshop }}</td>
+                                    <td class="clickable-cell" style="font-weight:300">
+                                        <div class="cell-content">{{ r.employee.full_name }}</div>
+                                        <a href="{% url 'core:employee_detail' employee_number=r.employee.employee_number %}"></a>
+                                    </td>                 
+                                    <td style="text-align:center;font-weight:300">{{ r.employee.employee_number }}</td>  
+                                    <td style="font-weight:300">{{ r.employee.position }}</td>  
+                                    <td style="text-align:center;font-weight:300">{{ r.c_grade }}</td>      
+                                    <td style="text-align:center;font-weight:300">{{ r.hiring_date }}</td>   
+                                    <td style="text-align:center;font-weight:300">{{ r.employee.birth_date }}</td>     
+                                    <td style="text-align:center;font-weight:300">{{ r.hire_source }}</td>
+                                    <td style="text-align:center;font-weight:300">{{ r.employee.employee_category }}</td>      
+                                </tr>
+                            {% elif data.action_type == 'dismissal' %}
+                                <tr>
+                                    <td style="text-align:center;font-weight:500">{{ r.row_number }}</td>          
+                                    <td class="clickable-cell" style="font-weight:300">
+                                        <div class="cell-content">{{ r.employee.full_name }}</div>
+                                        <a href="{% url 'core:employee_detail' employee_number=r.employee.employee_number %}"></a>
+                                    </td>  
+                                    <td style="text-align:center;font-weight:300">{{ r.employee.workshop }}</td>  
+                                    <td style="text-align:center;font-weight:300">{{ r.employee.employee_number }}</td>   
+                                    <td style="font-weight:300">{{ r.employee.position }}</td>       
+                                    <td style="text-align:center;font-weight:300">{{ r.employee.employee_category }}</td> 
+                                    <td style="text-align:center;font-weight:300">{{ r.c_grade }}</td>
+                                    <td style="text-align:center;font-weight:300">{{ r.employee.birth_date }}</td>  
+                                    <td style="text-align:center;font-weight:300">{{ r.hiring_date }}</td>       
+                                    <td style="text-align:center;font-weight:300">{{ r.employee.dismissal_date_fact }}</td> 
+                                    <td style="text-align:center;font-weight:300">{{ r.dismissal_date }}</td> 
+                                    <td style="text-align:center;font-weight:300">{{ r.employee.expirence }}</td>                                                                                    
+                                </tr>
+                            {% endif %}
+                        {% endfor %}                                           
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if page_obj.has_other_pages %}
+    <!-- Подвал пагинации: слева — инфо о диапазоне, справа — кнопки навигации -->
+    <div style="padding:12px 18px;border-top:1px solid var(--border);
+                display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+
+        <!-- Показано X–Y из Z -->
+        <span style="font-size:12px;color:var(--text-muted)">
+            Показано
+            <strong style="color:var(--text-secondary)">{{ page_obj.start_index }}–{{ page_obj.end_index }}</strong>
+            из <strong style="color:var(--text-secondary)">{{ total_count }}</strong>
+        </span>
+
+        <!-- Кнопки пагинации -->
+        <nav style="display:flex;align-items:center;gap:4px;">
+
+            <!-- В начало + предыдущая -->
+            {% if page_obj.has_previous %}
+            <a class="pg-btn" title="Первая страница"
+               href="?page=1">
+                <i class="bi bi-chevron-double-left"></i>
+            </a>
+            <a class="pg-btn" title="Предыдущая"
+               href="?page={{ page_obj.previos_page_number}}">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+            {% else %}
+            <span class="pg-btn pg-disabled"><i class="bi bi-chevron-double-left"></i></span>
+            <span class="pg-btn pg-disabled"><i class="bi bi-chevron-left"></i></span>
+            {% endif %}
+
+            <!-- Номера страниц: всегда первая + окно ±2 вокруг текущей + всегда последняя -->
+            <!-- Между ними многоточие, если есть разрыв -->
+            {% with cur=page_obj.number total=page_obj.paginator.num_pages %}
+
+                {% if cur > 3 %}
+                <a class="pg-btn"
+                   href="?page=1">1</a>
+                {% endif %}
+
+                {% if cur > 4 %}
+                <span class="pg-ellipsis">…</span>
+                {% endif %}
+
+                {% for p in page_obj.paginator.page_range %}
+                    {% if p >= cur|add:"-2" and p <= cur|add:"2" %}
+                        {% if p == cur %}
+                        <span class="pg-btn pg-current">{{ p }}</span>
+                        {% else %}
+                        <a class="pg-btn"
+                           href="?page={{ p }}">{{ p }}</a>
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+
+                {% if cur < total|add:"-3" %}
+                <span class="pg-ellipsis">…</span>
+                {% endif %}
+
+                {% if cur < total|add:"-2" %}
+                <a class="pg-btn"
+                   href="?page={{ total }}">{{ total }}</a>
+                {% endif %}
+
+            {% endwith %}
+
+            <!-- Следующая + в конец -->
+            {% if page_obj.has_next %}
+            <a class="pg-btn" title="Следующая"
+               href="?page={{ page_obj.next_page_number }}">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            <a class="pg-btn" title="Последняя страница"
+               href="?page={{ page_obj.paginator.num_pages }}">
+                <i class="bi bi-chevron-double-right"></i>
+            </a>
+            {% else %}
+            <span class="pg-btn pg-disabled"><i class="bi bi-chevron-right"></i></span>
+            <span class="pg-btn pg-disabled"><i class="bi bi-chevron-double-right"></i></span>
+            {% endif %}
+
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+    <style>
+        .clickable-cell {
+            position: relative;
+        }
+
+        .clickable-cell a {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            text-indent: -9999px;
+            overflow: hidden;
+        }
+
+        .clickable-cell.cell-content {
+            position: relative;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .pg-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 32px;
+            height: 32px;
+            padding: 0 6px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            text-decoration: none;
+            transition: all .15s;
+            user-select: none;
+        }
+
+        .pg-btn:hover {
+            background: var(--surface-3);
+            color: var(--text-primary);
+            border-color: rgba(255,255,255,.12);
+        }
+
+        /* Активная (текущая) страница */
+        .pg-btn.pg-current {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+            cursor: default;
+        }
+        
+        /* Недоступные кнопки (первая/последняя страница) */
+        .pg-btn.pg-disabled {
+            opacity: .3;
+            cursor: default;
+            pointer-events: none;
+        }
+        .pg-ellipsis {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 24px;
+            height: 32px;
+            font-size: 13px;
+            color: var(--text-muted);
+            user-select: none;
+        }
+        .table-container {
+            max-height: 80vh;
+            overflow-y: auto;
+            display: block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            background: #f0f0f0;
+            z-index: 1;
+        }
+    </style>
+{% endblock %}

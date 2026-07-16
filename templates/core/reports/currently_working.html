@@ -1,0 +1,297 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load core_extras %}
+{% block title %}{{ data.details_type }} на {{ data.details_date }}{% endblock %}
+{% block page_title %}{{ data.details_type }} на {{ data.details_date }}{% endblock %}
+
+{% block content %}
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        .cards-grid {
+            max-width: 1280px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            column-gap: 5rem;
+            row-gap: 2rem;
+        }
+
+        .card {
+            background: #ffffff;
+            border-radius: 1.25rem;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.02);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 30px -12px rgba(0, 0, 0, 0.15);
+        }
+
+        .card-header {
+            background: #1e293b;
+            color: white;
+            text-align: center;
+            padding: 0.8rem 1rem;
+            border-bottom: 2px solid #fa7c15;
+            text-transform: uppercase;
+        }
+
+        .card-header h2,
+        .card-header h3 {
+            margin: 0;
+            font-weight: 600;
+            font-size: 1.6rem;
+            letter-spacing: -0.01em;
+            word-break: break-word;
+        }
+
+        .card-header h3 {
+            font-size: 1.45rem;
+        }
+
+        .card-body {
+            padding: 1.6rem, 1.5rem, 2rem, 1.5rem;
+            background: #ffffff;
+            flex: 1;
+        }
+
+        .card-body p {
+            margin: 0 0 1rem 0;
+            color: #0f172a;
+            font-size: 1.2rem;
+            text-align: left;
+            line-height: 0.5;
+        }
+
+        .card-body ul,
+        .card-body ol {
+            text-align: left;
+            padding-left: 1.4rem;
+            margin: 0.75rem 0 0.5rem 0;
+            color: #1e293b;
+        }
+
+        .card-body li {
+            margin-bottom: 0.35rem;
+        }
+
+        .card-divider {
+            height: 1px;
+            background: #e2e8f0;
+            margin: 0.75rem 0 1rem 0;
+        }
+
+        .highlight-text {
+            background: #fef9e3;
+            border-left: 4px solid #fa7c15;
+            padding: 0.5rem 1rem;
+            border-radius: 0.75rem;
+            margin-top: 0.75rem;
+            font-size: 0.9rem;
+            text-align: left;
+        }
+
+        @media(max-width: 640px) {
+            .cards-grid {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+
+            .card-header h2, .card-header h3 {
+                font-size: 1.4rem;
+            }
+
+            .card-body {
+                padding: 1.3rem;
+            }
+        }
+
+        @media(min-width: 1400px) {
+            .cards-grid {
+                max-width: 1320px;
+            }
+        }
+
+        .table-container {
+            max-height: 500px;
+            overflow-y: auto;
+            display: block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            background: #f0f0f0;
+            z-index: 1;
+        }
+    </style>
+
+    <div class="cards-grid">
+        <div class="card">
+            <div class="card-header">
+                <h3>Практика</h3>
+            </div>
+            <div class="card-body">
+                <p>СПО &mdash; {{ data.stats.trainees_ve|default:0 }} чел.</p>
+                <p>ЦПП &mdash; {{ data.stats.trainees_tc|default:0 }} чел.</p>
+                <p>Всего &mdash; {{ data.stats.trainees_total|default:0 }} чел.</p>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Прием студентов</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>за {{data.stats.prev_year}} год &mdash; {{data.stats.students_prev_year}} чел.</p>
+                        <p>за {{data.stats.curr_year}} год &mdash; {{data.stats.students_curr_year}} + {{data.stats.from_tc}} ч/з ЦПП = {{data.stats.students_curr_year|add:data.stats.from_tc}} чел.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>Списочная численность</h3>
+            </div>
+            <div class="card-body">
+                <p>Мужчин &mdash; {{data.stats.employees_stats.male_count|default:0}} чел. ({{data.stats.employees_stats.male_percent}}%)</p>
+                <p>Женщин &mdash; {{data.stats.employees_stats.female_count|default:0}} чел. ({{data.stats.employees_stats.female_percent}}%)</p>
+                <p>Всего &mdash; {{data.stats.employees_stats.total_emps|default:0}} чел.</p>
+                <p>Средний возраст &mdash; {{data.stats.employees_stats.avg_age|default:0}} г.</p>
+                <p>Иногородних работников: {{data.stats.non_local_emps|default:0}} чел.</p>
+                <p style="color:{% if month_diff > 0 %}#16a34a{% elif month_diff < 0 %}#dc2626{% else %}var(--text-muted){% endif %}">
+                    Разница с начала месяца: {% if month_diff > 0 %}+{% endif %}{{ month_diff }}
+                </p>
+                <p style="color:{% if total_diff > 0 %}#16a34a{% elif total_diff < 0 %}#dc2626{% else %}var(--text-muted){% endif %}">
+                    Разница с начала года: {% if total_diff > 0 %}+{% endif %}{{ total_diff }}
+                </p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>Кадровые агенства</h3>
+            </div>
+            <div class="card-body">
+                <p>ВСП &mdash; {{data.stats.outstaffers_wap|default:0}} чел.</p>
+                <p>МСП &mdash; {{data.stats.outstaffers_map|default:0}} чел.</p>
+                <p>МП &mdash; {{data.stats.outstaffers_mp|default:0}} чел.</p>
+                <p>Всего &mdash; {{data.stats.outstaffers_total|default:0}} чел.</p>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h3>Пенсионеры</h3>
+            </div>
+            <div class="card-body">
+                <p>Расчёт за 2025 г. &mdash; 536 чел.</p>
+                <p>Возврат за 2025 г. &mdash; 100 чел. (18,7%)</p>
+                {% for p in data.stats.pensioners_left %}
+                    <p>Расчёт за {{ p.year }} г. &mdash; {{ p.count|default:0 }} чел.</p>
+                {% endfor %}
+                {% for p in data.stats.pensioners_return %}
+                    <p>Возврат за {{ p.year }} г. &mdash; {{ p.count|default:0 }} чел. ({{ data.stats.pensioners_percent|default:0 }}%)</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>После СВО</h3>
+            </div>
+            <div class="card-body">
+                {% for z in data.stats.zov_count %}
+                    {% if z.year == data.stats.curr_year  %}
+                        <p>за {{ z.year }} год &mdash; {{ z.count }} чел., в том числе за {{ data.stats.curr_month }} &mdash; {{ data.stats.zov_count_curr_month }} чел.</p>
+                    {% else %}
+                        <p>за {{ z.year }} год &mdash; {{ z.count }} чел.</p>
+                    {% endif %}
+                {% endfor %}
+                <p>Всего &mdash; {{ data.stats.zov_total }} чел. </p>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h3>После службы в РА</h3>
+            </div>
+            <div class="card-body">
+                <p>За 2024 г. &mdash; 130 чел. (56 &mdash; возврат)</p>
+                <p>За 2025 г. &mdash; 114 чел. (57 &mdash; возврат)</p>
+                {% for i, j in data.stats.army %}
+                    <p>За {{ i.year }} г. &mdash; {{ i.count }} чел. ({{ j.count }} &mdash; возврат)</p>
+                {% endfor %}
+                <p>За {{ data.stats.curr_month }} {{ data.stats.curr_year }} г. &mdash; {{ data.stats.army_curr_month_left }} чел. ({{ data.stats.army_curr_month_return }} &mdash; возврат)
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Численность на {{data.details_date}}</h3>
+        </div>
+        <div class="card-body">
+            <div class='table-container' style="overflow-x:auto">
+                <table class="table mb-0">
+                    <thead>
+                        <tr>    
+                            <th style="text-align:center">Производство</th> 
+                            <th style="text-align:center">Основные, чел</th>          
+                            <th style="text-align:center">Основные, %</th>        
+                            <th style="text-align:center">Вспомогательные, чел</th>          
+                            <th style="text-align:center">Вспомогательные, %</th> 
+                            <th style="text-align:center">РСС, чел</th>          
+                            <th style="text-align:center">РСС, %</th> 
+                            <th style="text-align:center">Ученики, чел</th>          
+                            <th style="text-align:center">Ученики, %</th>    
+                            <th style="text-align:center">Общество, чел</th>          
+                            <th style="text-align:center">Общество, %</th>                
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in data.stats.headcount_table.headcount_stats %}
+                            <tr style="text-align:center"> 
+                                <td style="font-weight: 400;">{{item.production__name}}</td>   
+                                <td style="font-weight: 600;">{{item.dl_count}}</td>     
+                                <td>{{item.dl_percent}}%</td>           
+                                <td style="font-weight: 600;">{{item.idl_count}}</td> 
+                                <td>{{item.idl_percent}}%</td>      
+                                <td style="font-weight: 600;">{{item.mss_count}}</td>  
+                                <td>{{item.mss_percent}}%</td>               
+                                <td style="font-weight: 600;">{{item.trainees_count}}</td> 
+                                <td>{{item.trainees_percent}}%</td>                 
+                                <td style="font-weight: 600;">{{item.total_count}}</td> 
+                                <td>{{item.total_percent}}%</td>  
+                            </tr>                                            
+                        {% endfor %}
+                        <tr style="text-align:center">
+                            <td style="font-weight: 900;">ВСЕГО</td>
+                            <td style="font-weight: 800;">{{data.stats.headcount_table.headcount_summary.dl}}</td>
+                            <td></td>
+                            <td style="font-weight: 800;">{{data.stats.headcount_table.headcount_summary.idl}}</td>
+                            <td></td>
+                            <td style="font-weight: 800;">{{data.stats.headcount_table.headcount_summary.mss}}</td>
+                            <td></td>
+                            <td style="font-weight: 800;">{{data.stats.headcount_table.headcount_summary.trainees}}</td>
+                            <td></td>
+                            <td style="font-weight: 800;">{{data.stats.headcount_table.headcount_summary.all}}</td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}
