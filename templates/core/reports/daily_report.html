@@ -1,0 +1,348 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load core_extras %}
+{% block title %}Сведения о приеме и увольнении работников по категориям и производствам за {{ data.report_date }}{% endblock %}
+{% block page_title %}<span id="dr-title">Сведения о приеме и увольнении работников за {{ data.report_date }}</span>{% endblock %}
+{% block topbar_actions %}
+<div style="width: 200px;">
+    <input type="date" class="form_control form-control-sm auto-filter" name="ddate"
+        value="{{ data.report_date|date:'Y-m-d' }}"
+        id="filter-row"
+        hx-get="{% url 'core:daily_report' %}"
+        hx-target="#report-wrap"
+        hx-trigger="change from:.auto-filter"
+        hx-include="#filter-row"
+        hx-select="#report-wrap"
+        hx-select-oob="dr-title,#filter-row"
+        hx-push-url="true">
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="report-wrap">
+
+<!-- Итоговые карточки -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-num" style="color:#16a34a">{{ data.total.hired_total }}</div>
+            <div class="stat-lbl">Приступило к работе</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-num" style="color:#dc2626">{{ data.total.dismissed_total }}</div>
+            <div class="stat-lbl">Уволено из Общества</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-num">{{ data.total.hired_t_total }}</div>
+            <div class="stat-lbl">Принято учеников</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-num">{{ data.total.dismissed_t_total }}</div>
+            <div class="stat-lbl">Уволено учеников</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+
+    <!-- Прием -->
+    <div class="col-12 col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-box-arrow-in-right" style="color:#16a34a"></i>
+                Прием за {{ data.report_date }}
+            </div>
+            <div class="card-body">
+                <div class="mv-total">
+                    Приступило к работе &mdash;
+                    <strong>{{ data.total.hired_total }}</strong> чел., в том числе:
+                </div>
+
+                <ul class="mv-list">
+                    <li>
+                        <span class="mv-cat">РСС</span>
+                        &mdash; <strong>{{ data.total.hired_mss_total }}</strong> чел.
+                        {% if data.mss_deps_h %}<span class="mv-deps">({{ data.mss_deps_h }})</span>{% endif %}
+                    </li>
+
+                    <li>
+                        <span class="mv-cat">Основные рабочие</span>
+                        &mdash; <strong>{{ data.total.hired_dl_total }}</strong> чел.
+                        {% if data.total.hired_dl_total %}, в том числе:{% endif %}
+                        <ul class="mv-sub">
+                            {% for i in data.hired_employees %}
+                                {% if i.dl_total != 0 %}
+                                    <li>{{ i.production__name }} &mdash; <strong>{{ i.dl_total }}</strong> чел.
+                                        <span class="mv-deps">({{ i.dl_deps }})</span></li>
+                                {% endif %}
+                            {% endfor %}
+                        </ul>
+                    </li>
+
+                    <li>
+                        <span class="mv-cat">Вспомогательные рабочие</span>
+                        &mdash; <strong>{{ data.total.hired_idl_total }}</strong> чел.
+                        {% if data.total.hired_idl_total %}, в том числе:{% endif %}
+                        <ul class="mv-sub">
+                            {% for i in data.hired_employees %}
+                                {% if i.idl_total != 0 %}
+                                    <li>{{ i.production__name }} &mdash; <strong>{{ i.idl_total }}</strong> чел.
+                                        <span class="mv-deps">({{ i.idl_deps }})</span></li>
+                                {% endif %}
+                            {% endfor %}
+                        </ul>
+                    </li>
+
+                    <li>
+                        <span class="mv-cat">Ученики</span>
+                        &mdash; <strong>{{ data.total.hired_t_total }}</strong> чел.
+                        {% if data.total.hired_t_total %}, в том числе:{% endif %}
+                        <ul class="mv-sub">
+                            {% for i in data.hired_trainees %}
+                                {% if i.t_total != 0 %}
+                                    <li>{{ i.production__name }} &mdash; <strong>{{ i.t_total }}</strong> чел.
+                                        <span class="mv-deps">({{ i.t_deps }})</span></li>
+                                {% endif %}
+                            {% endfor %}
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Увольнение -->
+    <div class="col-12 col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-box-arrow-right" style="color:#dc2626"></i>
+                Уволено за {{ data.report_date }}
+            </div>
+            <div class="card-body">
+                <div class="mv-total">
+                    Уволено из Общества &mdash;
+                    <strong>{{ data.total.dismissed_total }}</strong> чел., в том числе:
+                </div>
+
+                <ul class="mv-list">
+                    <li>
+                        <span class="mv-cat">РСС</span>
+                        &mdash; <strong>{{ data.total.dismissed_mss_total }}</strong> чел.
+                        {% if data.mss_deps_d %}<span class="mv-deps">({{ data.mss_deps_d }})</span>{% endif %}
+                    </li>
+
+                    <li>
+                        <span class="mv-cat">Основные рабочие</span>
+                        &mdash; <strong>{{ data.total.dismissed_dl_total }}</strong> чел.
+                        {% if data.total.dismissed_dl_total %}, в том числе:{% endif %}
+                        <ul class="mv-sub">
+                            {% for i in data.dismissed_employees %}
+                                {% if i.dl_total != 0 %}
+                                    <li>{{ i.production__name }} &mdash; <strong>{{ i.dl_total }}</strong> чел.
+                                        <span class="mv-deps">({{ i.dl_deps }})</span></li>
+                                {% endif %}
+                            {% endfor %}
+                        </ul>
+                    </li>
+
+                    <li>
+                        <span class="mv-cat">Вспомогательные рабочие</span>
+                        &mdash; <strong>{{ data.total.dismissed_idl_total }}</strong> чел.
+                        {% if data.total.dismissed_idl_total %}, в том числе:{% endif %}
+                        <ul class="mv-sub">
+                            {% for i in data.dismissed_employees %}
+                                {% if i.idl_total != 0 %}
+                                    <li>{{ i.production__name }} &mdash; <strong>{{ i.idl_total }}</strong> чел.
+                                        <span class="mv-deps">({{ i.idl_deps }})</span></li>
+                                {% endif %}
+                            {% endfor %}
+                        </ul>
+                    </li>
+
+                    <li>
+                        <span class="mv-cat">Ученики</span>
+                        &mdash; <strong>{{ data.total.dismissed_t_total }}</strong> чел.
+                        {% if data.total.dismissed_t_total %}, в том числе:{% endif %}
+                        <ul class="mv-sub">
+                            {% for i in data.dismissed_trainees %}
+                                {% if i.t_total != 0 %}
+                                    <li>{{ i.production__name }} &mdash; <strong>{{ i.t_total }}</strong> чел.
+                                        <span class="mv-deps">({{ i.t_deps }})</span></li>
+                                {% endif %}
+                            {% endfor %}
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Движение -->
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-arrow-left-right" style="color:var(--accent)"></i>
+        Оперативное движение персонала за {{ data.month_passed }} {{ data.year }} года
+    </div>
+    <div style="overflow-x:auto">
+        <div class="table-container">
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th colspan="3" style="text-align:center;min-width:240px">Производство / Категория</th>
+                        {% for cat in data.transfers.cats %}
+                            <th style="text-align:center;min-width:90px">{{ cat }}</th>
+                        {% endfor %}
+                        <th style="text-align:center;min-width:90px">ВСЕГО</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in data.transfers.table %}
+                    <tr>
+                        <td rowspan="4" class="prod-cell">{{ row.production }}</td>
+                        <td rowspan="2" class="grp-cell" style="color:#16a34a">Прибыло</td>
+                        <td class="sub-cell">Прием</td>
+                        {% for cell in row.categories %}
+                            <td style="text-align:center">{{ cell.hired }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td class="sub-cell">Перевод</td>
+                        {% for cell in row.categories %}
+                            <td style="text-align:center">{{ cell.arrived }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td rowspan="2" class="grp-cell" style="color:#dc2626">Убыло</td>
+                        <td class="sub-cell">Уволено</td>
+                        {% for cell in row.categories %}
+                            <td style="text-align:center">{{ cell.dismissed }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td class="sub-cell">Перевод</td>
+                        {% for cell in row.categories %}
+                            <td style="text-align:center">{{ cell.departed }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr class="balance-row">
+                        <td colspan="3" style="text-align:center;font-weight:700">БАЛАНС</td>
+                        {% for cell in row.categories %}
+                            <td style="text-align:center;font-weight:600;{% if cell.balance > 0 %}color:#16a34a{% elif cell.balance < 0 %}color:#dc2626{% endif %}">
+                                {% if cell.balance > 0 %}+{% endif %}{{ cell.balance }}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="20" style="text-align:center;padding:40px;color:var(--text-muted)">
+                            <i class="bi bi-inbox" style="font-size:28px;display:block;margin-bottom:8px"></i>
+                            Нет данных
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+/* --- Списки движения персонала --- */
+.card-header {
+    font-size: 20px;
+}
+.mv-total {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+}
+.mv-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.mv-list > li {
+    padding: 8px 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+}
+.mv-list > li:last-child {
+    border-bottom: none;
+}
+.mv-cat {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.mv-sub {
+    list-style: none;
+    margin: 6px 0 0 0;
+    padding-left: 16px;
+    border-left: 2px solid var(--border);
+}
+.mv-sub li {
+    padding: 3px 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+.mv-deps {
+    font-size: 14px;
+}
+
+/* --- Таблица движения --- */
+.prod-cell {
+    font-weight: 500;
+    color: var(--text-primary);
+    vertical-align: middle;
+    border-right: 2px solid var(--border);
+    border-top: 2px solid var(--border);
+    background: var(--surface) !important;
+}
+.grp-cell {
+    font-weight: 600;
+    font-size: 14px;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+.sub-cell {
+    font-size: 14px;
+    white-space: nowrap;
+}
+.balance-row {
+    background: var(--surface-2);
+}
+.balance-row td {
+    border-top: 1px solid var(--border);
+    border-bottom: 2px solid var(--border);
+}
+
+.table-container {
+    max-height: 70vh;
+    overflow-y: auto;
+    display: block;
+}
+.table-container table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.table-container thead th {
+    position: sticky;
+    top: 0;
+    background: #f0f0f0;
+    z-index: 2;
+}
+</style>
+
+</div>
+{% endblock %}

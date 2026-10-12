@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% block title %}Зарплата{% endblock %}
+{% block page_title %}Зарплата{% endblock %}
+{% block nav_salary %}active{% endblock %}
+
+{% block content %}
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-num">{{ total_count }}</div>
+            <div class="stat-lbl">Всего записей</div>
+        </div>
+    </div>
+</div>
+
+<!-- Фильтры -->
+<div class="card mb-4">
+    <div class="card-body" style="padding:14px 18px">
+        <div class="row g-2 align-items-end"
+             id="filter-row"
+             hx-get="{% url 'core:salary_list' %}"
+             hx-target="#table-wrap"
+             hx-trigger="change from:.auto-filter"
+             hx-include="#filter-row"
+             hx-push-url="true">
+
+            <div class="col-md-3">
+                <label class="form-label">ФИО или табельный номер</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control auto-filter" name="search"
+                           value="{{ search }}" placeholder="Иванов Иван Иванович"
+                           hx-get="{% url 'core:salary_list' %}"
+                           hx-target="#table-wrap"
+                           hx-trigger="keyup changed delay:350ms"
+                           hx-include="#filter-row"
+                           hx-push-url="true">
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Должность</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control auto-filter" name="position"
+                           value="{{ position }}" placeholder="Инженер"
+                           hx-get="{% url 'core:salary_list' %}"
+                           hx-target="#table-wrap"
+                           hx-trigger="keyup changed delay:350ms"
+                           hx-include="#filter-row"
+                           hx-push-url="true">
+                </div>
+            </div>
+
+            <div class="col-md-1">
+                <label class="form-label">Категория</label>
+                <select class="form-select form-select-sm auto-filter" name="category">
+                    <option value="">Все</option>
+                    {% for c in employee_categories %}
+                    <option value="{{ c.id }}" {% if selected_category == c.id|stringformat:"s" %}selected{% endif %}>
+                        {{ c.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">Производство</label>
+                <select class="form-select form-select-sm auto-filter" name="production">
+                    <option value="">Все</option>
+                    {% for p in productions %}
+                    <option value="{{ p.id }}" {% if selected_production == p.id|stringformat:"s" %}selected{% endif %}>
+                        {{ p.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-1">
+                <label class="form-label">Цех</label>
+                <select class="form-select form-select-sm auto-filter" name="workshop">
+                    <option value="">Все</option>
+                    {% for w in workshops %}
+                    <option value="{{ w.id }}" {% if selected_workshop == w.id|stringformat:"s" %}selected{% endif %}>
+                        {{ w.number }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-1">
+                <label class="form-label">Статус</label>
+                <select class="form-select form-select-sm auto-filter" name="status">
+                    <option value="">Все</option>
+                    <option value="active"    {% if selected_status == 'active'    %}selected{% endif %}>Работают</option>
+                    <option value="dismissed" {% if selected_status == 'dismissed' %}selected{% endif %}>Уволены</option>
+                </select>
+            </div>
+
+            <!-- Выбор количества строк на странице -->
+            <div class="col-md-1" style="max-width: 70px;">
+                <label class="form-label">Строк</label>
+                <select class="form-select form-select-sm auto-filter" name="per_page">
+                    {% for opt in per_page_options %}
+                    <option value="{{ opt }}" {% if per_page == opt %}selected{% endif %}>{{ opt }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-1">
+                <a href="{% url 'core:salary_list' %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-x me-1"></i>Сбросить
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Таблица -->
+<div id="table-wrap">
+    {% include 'core/salary/partials/salary_employee_table.html' %}
+</div>
+
+<!-- Модальное окно -->
+ <div class="modal fade" id="salaryModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content" style="border:1px solid var(--border);border-radius:10px">
+            <div class="modal-header" style="background:var(--surface-2);border-bottom:1px solid var(--border);border-radius:10px 10px 0 0;">
+                <h5 class="modal-title" style="font-size:14px;font-weight:600" id="salaryModalLabel">Зарплата</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="salary-modal-body" style="padding:0">
+                <div style="padding:48px;text-align:center;color:var(--text-muted)">
+                    <i class="bi bi-arrow-clockwise" style="font-size:28px"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+ </div>
+
+{% endblock %}

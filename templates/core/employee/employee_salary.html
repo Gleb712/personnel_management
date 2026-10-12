@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% load core_extras %}
+{% block title %}Зарплата - {{ employee.full_name }}{% endblock %}
+{% block page_title %}Зарплата {{ employee.full_name }}{% endblock %}
+{% block nav_employees %}active{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'core:employee_detail' employee.employee_number %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>К карточке сотрудника
+</a>
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-3" style="flex-wrap:wrap;gap:12px">
+    <div style="font-size:15px;color:var(--text-secondary)">
+        {{ employee.full_name }} - <code>{{ employee.employee_number }}</code>
+    </div>
+
+    {% if available_years %}
+    <form method="get" style="display:flex;align-items:center;gap:8px">
+        <label for="year-select" style="font-size:13px;color:var(--text-muted);margin:0">Год:</label>
+        <select id="year-select" name="year" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+            {% for y in available_years %}
+                <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }} </option>
+            {% endfor %}
+        </select>
+    </form>
+    {% endif %}
+</div>
+
+<div class="card" style="border-radius:0 10px 10px 10px">
+    <div class="table-container" style="overflow-x:auto">
+        <table class="table mb-0">
+            <thead>
+                <tr>
+                    <th style="text-align:center;min-width:100px">Месяц</th>
+                    <th style="text-align:center;min-width:80px">Часы</th>
+                    <th style="text-align:center;min-width:120px">Зарплата</th>
+                    <th style="text-align:center;min-width:120px">Отпускные</th>
+                    <th style="text-align:center;min-width:140px">Итого</th>
+                    <th style="text-align:center;width:80px">Статус</th>
+                </tr>
+            </thead>
+            <tbody> 
+                {% for row in table_rows %}
+                <tr>
+                    <td style="text-align:center">{{ row.salary_date|date:"F Y" }}</td>
+                    <td style="text-align:center">{{ row.hours }}</td>
+                    <td style="text-align:center">{{ row.main_sum|intspace }} &#8381;</td>
+                    <td style="text-align:center">{{ row.vacation_sum|intspace }} &#8381;</td>
+                    <td style="text-align:center;font-weight:600">{{ row.total_sum|intspace }} &#8381;</td>
+                    <td style="text-align:center">
+                        {% if row.status == 'up' %}
+                            <i class="bi bi-arrow-up-circle-fill" style="color:#16a34a;font-size:16px" title="Выше предыдущего месяца"></i>
+                        {% elif row.status == 'down' %}
+                            <i class="bi bi-arrow-down-circle-fill" style="color:#dc2626;font-size:16px" title="Ниже предыдущего месяца"></i>
+                        {% elif row.status == 'equal' %}
+                            <i class="bi bi-dash-circle" style="color:var(--text-muted);font-size:16px" title="Не изменилась"></i>
+                        {% else %}
+                            <span style="color:var(--text-muted)">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" style="text-align:center;padding:48px;color:var(--text-muted)">
+                        <i class="bi bi-inbox" style="font-size:32px;display:block;margin-bottom:8px"></i>
+                        Данные по зарабатной плате за {{ selected_year }} год не найдены
+                    </td>
+                </tr>
+                {% endfor %}                                           
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

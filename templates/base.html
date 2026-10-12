@@ -1,0 +1,363 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}HR Analytics{% endblock %}</title>
+    <link href="{% static 'vendors/bootstrap-5.3.8/css/bootstrap.min.css' %}" rel="stylesheet">
+    <link href="{% static 'vendors/bootstrap-icons-1.11.3/font/bootstrap-icons.min.css' %}" rel="stylesheet">
+    <link href="{% static 'vendors/fonts/inter.css' %}" rel="stylesheet">
+    <link href="{% static 'vendors/fonts/jetbrains-mono.css' %}" rel="stylesheet">
+    <style>
+        :root {
+            --accent:        #e07b2a;
+            --accent-hover:  #c96a1e;
+            --accent-dim:    rgba(224,123,42,.1);
+            --accent-soft:   rgba(224,123,42,.06);
+            --sidebar-bg:     #1a1a1a;
+            --sidebar-hover:  #2a2a2a;
+            --sidebar-active: #333333;
+            --sidebar-border: rgba(255,255,255,.06);
+            --sidebar-text:   #c8c8c8;
+            --sidebar-muted:  #666666;
+            --header-bg:  #222222;
+            --surface:    #ffffff;
+            --surface-2:  #f4f4f4;
+            --surface-3:  #ebebeb;
+            --border:     #e0e0e0;
+            --border-strong: #cccccc;
+            --text-primary:   #111111;
+            --text-secondary: #555555;
+            --text-muted:     #999999;
+            --total-bg:    #f0f0f0;
+            --subtotal-bg: #f8f8f8;
+            --green:  #16a34a;
+            --red:    #dc2626;
+            --yellow: #d9c006;
+            --sidebar-w: 240px;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--surface-2);
+            color: var(--text-primary);
+            min-height: 100vh;
+            max-width: 100vw;
+            display: flex;
+            font-size: 14px;
+            line-height: 1.5;
+            overflow-x: auto;
+        }
+
+        .sidebar {
+            width: var(--sidebar-w);
+            background: var(--sidebar-bg);
+            position: fixed;
+            top: 0; left: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            z-index: 200;
+        }
+        .sidebar-logo {
+            padding: 20px 16px 16px;
+            border-bottom: 1px solid var(--sidebar-border);
+            display: flex; align-items: center; gap: 10px;
+        }
+        .logo-icon {
+            width: 34px; height: 34px;
+            background: var(--accent); border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 16px; flex-shrink: 0;
+        }
+        .logo-text { line-height: 1.2; }
+        .logo-title { font-weight: 700; font-size: 13px; color: #ffffff; }
+        .logo-sub   { font-size: 11px; color: var(--sidebar-muted); }
+        .sidebar-nav { padding: 12px 10px; flex: 1; overflow-y: auto; }
+        .nav-section {
+            font-size: 10px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: .08em;
+            color: var(--sidebar-muted);
+            padding: 12px 8px 4px;
+        }
+        .s-link {
+            display: flex; align-items: center; gap: 9px;
+            padding: 8px 10px; border-radius: 7px;
+            color: var(--sidebar-text);
+            font-size: 13px; font-weight: 500;
+            text-decoration: none; transition: all .15s; margin-bottom: 1px;
+        }
+        .s-link i { font-size: 15px; flex-shrink: 0; }
+        .s-link:hover  { background: var(--sidebar-hover); color: #ffffff; }
+        .s-link.active { background: var(--accent); color: #ffffff; }
+        .s-link.soon   { opacity: .35; pointer-events: none; }
+        .s-link .badge-soon {
+            margin-left: auto; font-size: 9px; font-weight: 600;
+            background: var(--sidebar-active); color: var(--sidebar-muted);
+            padding: 2px 6px; border-radius: 4px;
+        }
+        .sidebar-user {
+            display: flex; align-items: center; gap: 9px;
+            padding: 8px 10px; border-radius: 7px; margin-bottom: 4px;
+        }
+        .sidebar-user-avatar {
+            width: 28px; height: 28px; background: var(--sidebar-active);
+            border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; font-size: 13px; color: var(--sidebar-text); flex-shrink: 0;
+        }
+        .sidebar-user-name { font-size: 12px; font-weight: 600; color: #ffffff; }
+        .sidebar-user-role { font-size: 10px; color: var(--sidebar-muted); }
+        .main-wrap {
+            margin-left: var(--sidebar-w); flex: 1;
+            display: flex; flex-direction: column; min-height: 100vh;
+        }
+        .topbar {
+            background: var(--header-bg); padding: 12px 28px;
+            display: flex; align-items: center; justify-content: space-between;
+            position: sticky; top: 0; z-index: 100; min-height: 56px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.15);
+        }
+        .topbar-title { font-size: 15px; font-weight: 600; color: #ffffff; margin: 0; }
+        .page-body {
+            padding: 24px 28px;
+            flex: 1;
+            max-width: 1600px;
+            width: 100%;
+            overflow-x: hidden;
+        }
+        .card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+        }
+        .card-header {
+            background: var(--surface-2); border-bottom: 1px solid var(--border);
+            padding: 14px 18px; font-weight: 600; font-size: 13px;
+            display: flex; align-items: center; gap: 8px;
+            color: var(--text-primary); border-radius: 10px 10px 0 0;
+        }
+        .card-body { padding: 18px; }
+        .stat-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 10px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+        }
+        .stat-num {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 28px; font-weight: 700; color: var(--accent);
+            line-height: 1; margin-bottom: 4px;
+        }
+        .stat-lbl {
+            font-size: 11px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: .06em; color: var(--text-muted);
+        }
+        .table { color: var(--text-primary); font-size: 13px; }
+        .table thead th {
+            background: var(--surface-3); border-color: var(--border);
+            color: var(--text-secondary); font-size: 11px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: .05em; padding: 10px 14px;
+        }
+        .table td {
+            border-color: var(--border); padding: 11px 14px;
+            vertical-align: middle; background: var(--surface);
+        }
+        .table tbody tr { transition: background .1s; }
+        .table tbody tr:hover td { background: var(--accent-soft) !important; }
+        .badge-active {
+            display: inline-block; background: #dcfce7; color: #15803d;
+            border-radius: 20px; padding: 3px 9px; font-size: 11px; font-weight: 600;
+        }
+        .badge-dismissed {
+            display: inline-block; background: #fee2e2; color: #dc2626;
+            border-radius: 20px; padding: 3px 9px; font-size: 11px; font-weight: 600;
+        }
+        .form-control, .form-select {
+            background: var(--surface) !important; border: 1px solid var(--border-strong) !important;
+            color: var(--text-primary) !important; font-size: 13px;
+        }
+        .form-control::placeholder { color: var(--text-muted); }
+        .form-control:focus, .form-select:focus {
+            border-color: var(--accent) !important;
+            box-shadow: 0 0 0 3px rgba(224,123,42,.15) !important;
+        }
+        .form-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 5px; }
+        .input-group-text {
+            background: var(--surface-2) !important; border: 1px solid var(--border-strong) !important;
+            color: var(--text-muted);
+        }
+        .btn { font-size: 13px; font-weight: 500; }
+        .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+        .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: #fff; }
+        .btn-outline-secondary {
+            background: var(--sidebar-active); border-color: var(--sidebar-active); color: #ffffff;
+        }
+        .btn-outline-secondary:hover {
+            background: var(--sidebar-hover); border-color: var(--sidebar-hover); color: #ffffff;
+        }
+        .btn-sm { padding: 5px 10px; font-size: 12px; }
+        .alert { border-radius: 8px; border: none; font-size: 13px; padding: 12px 14px; }
+        .alert-success { background: #f0fdf4; color: #15803d; border-left: 3px solid var(--green); }
+        .alert-warning { background: #fffbeb; color: #b45309; border-left: 3px solid var(--yellow); }
+        .alert-danger  { background: #fef2f2; color: #dc2626; border-left: 3px solid var(--red); }
+        .alert-info    { background: var(--accent-dim); color: #92400e; border-left: 3px solid var(--accent); }
+        .btn-close { filter: none; opacity: .5; }
+        .pagination .page-link {
+            background: var(--surface); border-color: var(--border);
+            color: var(--text-secondary); font-size: 12px;
+        }
+        .pagination .page-item.active .page-link {
+            background: var(--accent); border-color: var(--accent); color: white;
+        }
+        .pagination .page-link:hover { background: var(--accent-dim); color: var(--accent); }
+        code {
+            background: var(--surface-3); color: #92400e;
+            padding: 2px 6px; border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace; font-size: 12px;
+        }
+        .htmx-indicator { display: none; }
+        .htmx-request .htmx-indicator { display: inline-block; }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+        #drop-zone {
+            border: 2px dashed var(--border-strong); border-radius: 10px;
+            padding: 36px 20px; text-align: center; cursor: pointer;
+            transition: all .2s; margin-bottom: 16px; background: var(--surface-2);
+        }
+        #drop-zone:hover { border-color: var(--accent); background: var(--accent-dim); }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<aside class="sidebar">
+    <div class="sidebar-logo">
+        <div class="logo-icon"><i class="bi bi-people-fill"></i></div>
+        <div class="logo-text">
+            <div class="logo-title">HR Analytics</div>
+            <div class="logo-sub">Управление персоналом</div>
+        </div>
+    </div>
+
+    <nav class="sidebar-nav">
+        <div class="nav-section">Данные</div>
+
+        {% if can_upload_files %}
+        <a href="{% url 'core:upload_file' %}" class="s-link {% block nav_upload %}{% endblock %}">
+            <i class="bi bi-cloud-upload"></i> Загрузка файлов
+        </a>
+        {% endif %}
+
+        <a href="{% url 'core:employee_list' %}" class="s-link {% block nav_employees %}{% endblock %}">
+            <i class="bi bi-people"></i> Сотрудники
+        </a>
+
+        {% if can_view_additional_info %}
+        <a href="{% url 'core:employee_list_extended' %}" class="s-link {% block nav_employees_extended %}{% endblock %}">
+            <i class="bi bi-table"></i> Подбор персонала
+        </a>
+        {% endif %}
+
+        {% if can_view_additional_info %}
+        <a href="{% url 'core:salary_list' %}" class="s-link {% block nav_salary %}{% endblock %}">
+            <i class="bi bi-cash-stack"></i> Зарплата
+        </a>
+        {% endif %}
+
+        <div class="nav-section">Аналитика</div>
+        <a href="{% url 'core:dashboard' %}"
+            class="s-link {% block nav_dashboard %}{% endblock %}">
+            <i class="bi bi-bar-chart-line"></i> Визуализация
+        </a>
+        <a href="{% url 'core:report_headcount' %}"
+           class="s-link {% block nav_report_headcount %}{% endblock %}">
+            <i class="bi bi-people"></i> Численность
+        </a>
+        <a href="{% url 'core:report_movement' %}"
+           class="s-link {% block nav_report_movement %}{% endblock %}">
+            <i class="bi bi-arrow-left-right"></i> Движение персонала
+        </a>
+        <a href="{% url 'core:daily_report' %}"
+           class="s-link">
+            <i class="bi bi-file-text"></i> Суточная справка
+        </a>
+        <a href="{% url 'core:report_table' %}"
+           class="s-link">
+            <i class="bi bi-table"></i> Табельный учёт
+        </a>
+    </nav>
+
+    <div class="sidebar-footer">
+        <a href="{% url 'core:profile' %}" class="s-link" style="margin-bottom:4px">
+            <div class="sidebar-user-avatar"><i class="bi bi-person"></i></div>
+            <div style="overflow:hidden;flex:1;min-width:0">
+                <div class="sidebar-user-name"
+                     style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                    {{ user_display_name }}
+                </div>
+                <div class="sidebar-user-role">
+                    {% if request.user.is_superuser %}
+                        Суперпользователь
+                    {% else %}
+                        {% with groups=request.user.groups.all %}
+                        {% if groups %}{{ groups.0.name }}{% else %}—{% endif %}
+                        {% endwith %}
+                    {% endif %}
+                </div>
+            </div>
+            <i class="bi bi-chevron-right"
+               style="font-size:10px;color:var(--sidebar-muted);flex-shrink:0"></i>
+        </a>
+ 
+        {% if can_view_admin %}
+        <a href="/admin/" class="s-link">
+            <i class="bi bi-gear"></i> Администрирование
+        </a>
+        {% endif %}
+        
+        <a href="{% url 'core:logout' %}"
+        style="display:inline-flex;align-items:center;gap:6px;width: var(--sidebar-w);
+                padding:6px 85px;border-radius:7px;font-size:13px;font-weight:500;
+                background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);
+                color:#f87171;text-decoration:none;transition:all .15s"
+        onmouseover="this.style.background='rgba(239,68,68,.2)'"
+        onmouseout="this.style.background='rgba(239,68,68,.1)'">
+            <i class="bi bi-box-arrow-right"></i>Выйти
+        </a>
+    </div>
+</aside>
+
+<div class="main-wrap">
+    <header class="topbar">
+        <h1 class="topbar-title">{% block page_title %}{% endblock %}</h1>
+        <div class="d-flex gap-2 align-items-center">
+            {% block topbar_actions %}{% endblock %}
+        </div>
+    </header>
+
+    <main class="page-body">
+        {% if messages %}
+        <div class="mb-4">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible d-flex align-items-center gap-2" role="alert">
+                {% if 'success' in message.tags %}<i class="bi bi-check-circle-fill"></i>
+                {% elif 'warning' in message.tags %}<i class="bi bi-exclamation-triangle-fill"></i>
+                {% elif 'error' in message.tags %}<i class="bi bi-x-circle-fill"></i>
+                {% else %}<i class="bi bi-info-circle-fill"></i>{% endif %}
+                <span>{{ message }}</span>
+                <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+</div>
+
+<script src="{% static 'vendors/bootstrap-5.3.8/js/bootstrap.bundle.min.js' %}"></script>
+<script src="{% static 'vendors/htmx-1.9.12/dist/htmx.min.js' %}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

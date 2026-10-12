@@ -1,0 +1,876 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load core_extras %}
+{% block title %}Визуализация{% endblock %}
+{% block page_title %}Визуализация{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block topbar_actions %}
+<form method="get" class="d-flex gap-2 align-items-center">
+    <select class="form-select form-select-sm" name="year" onchange="this.form.submit()" style="width:auto">
+        {% for y in available_years %}
+        <option value="{{ y }}" {% if selected_year == y|stringformat:"s" %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+    </select>
+</form>
+{% endblock %}
+
+{% block content %}
+
+{# Итоговые карточки #}
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <a href="{% url 'core:currently_working' %}" class="text-decoration-none">
+            <div class="dash-card">
+                <div class="dash-card-icon" style="background:rgba(37,99,235,.12);color:#2563eb">
+                    <i class="bi bi-people-fill"></i>
+                </div>
+                <div>
+                    <div class="dash-card-num">{{ movement.work_atm }}</div>
+                    <div class="dash-card-lbl">Работает сейчас</div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-6 col-lg-3">
+        <a href="{% url 'core:dashboard_details' 0 %}" class="text-decoration-none">
+        <div class="dash-card">
+            <div class="dash-card-icon" style="background:rgba(22,163,74,.12);color:#16a34a">
+                <i class="bi bi-person-plus-fill"></i>
+            </div>
+            <div>
+                <div class="dash-card-num" style="color:#16a34a">{{ movement.total_hired }}</div>
+                <div class="dash-card-lbl">Принято за {{ movement.year }}</div>
+            </div>
+        </div>
+        </a>
+    </div>
+    <div class="col-6 col-lg-3">
+        <a href="{% url 'core:dashboard_details' 1 %}" class="text-decoration-none">
+        <div class="dash-card">
+            <div class="dash-card-icon" style="background:rgba(220,38,38,.12);color:#dc2626">
+                <i class="bi bi-person-dash-fill"></i>
+            </div>
+            <div>
+                <div class="dash-card-num" style="color:#dc2626">{{ movement.total_dismissed }}</div>
+                <div class="dash-card-lbl">Уволено за {{ movement.year }}</div>
+            </div>
+        </div>
+        </a>
+    </div>
+    <div class="col-6 col-lg-3">
+        <a href="{% url 'core:transfers_details' %}" class="text-decoration-none">
+            <div class="dash-card">
+                <div class="dash-card-icon" style="background:rgba(37,99,235,.12);color:#2563eb">
+                    <i class="bi bi-shuffle"></i>
+                </div>
+                <div>
+                    <div class="dash-card-num">{{ movement.transfers_count }}</div>
+                    <div class="dash-card-lbl">Переводов за {{ movement.year }} год</div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="dash-card">
+            <div class="dash-card-icon" style="background:rgba(217,119,6,.12);color:#d97706">
+                <i class="bi bi-arrow-repeat"></i>
+            </div>
+            <div>
+                <div class="dash-card-num" style="color:{% if turnover_rate > 20 %}#dc2626{% elif turnover_rate > 10 %}#d97706{% else %}#16a34a{% endif %}">
+                    {{ turnover_rate }}%
+                </div>
+                <div class="dash-card-lbl">Текучесть за {{ movement.year }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <a href="{% url 'core:dashboard_details' 3 %}" class="text-decoration-none">
+        <div class="dash-card">
+            <div class="dash-card-icon" style="background:rgba(22,163,74,.12);color:#16a34a">
+                <i class="bi bi-person-plus-fill"></i>
+            </div>
+            <div>
+                <div class="dash-card-num" style="color:#16a34a">{{ movement.total_t_hired }}</div>
+                <div class="dash-card-lbl">Принято учеников за {{ movement.year }}</div>
+            </div>
+        </div>
+        </a>
+    </div>
+    <div class="col-6 col-lg-3">
+        <a href="{% url 'core:dashboard_details' 4 %}" class="text-decoration-none">
+        <div class="dash-card">
+            <div class="dash-card-icon" style="background:rgba(220,38,38,.12);color:#dc2626">
+                <i class="bi bi-person-dash-fill"></i>
+            </div>
+            <div>
+                <div class="dash-card-num" style="color:#dc2626">{{ movement.total_t_dismissed }}</div>
+                <div class="dash-card-lbl">Уволено учеников за {{ movement.year }}</div>
+            </div>
+        </div>
+        </a>
+    </div>
+</div>
+
+{# Подкарточки: категории + разница #}
+<div class="row g-3 mb-4">
+    {% for cat_name, cat_count in headcount.grand_categories.items %}
+    <div class="col" style="min-width:0">
+        <a href="{% url 'core:cats_details' emp_category=cat_name %}" class="text-decoration-none">
+            <div class="dash-sub-card">
+                <span class="dash-sub-lbl">{{ cat_name }}</span>
+                <span class="dash-sub-val" style="color: black;">{{ cat_count }}</span>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+    <div class="col" style="min-width:0">
+        <div class="dash-sub-card">
+            <span class="dash-sub-lbl">Разница за год</span>
+            <span class="dash-sub-val" style="color:{% if movement.total_diff > 0 %}#16a34a{% elif movement.total_diff < 0 %}#dc2626{% else %}var(--text-muted){% endif %}">
+                {% if movement.total_diff > 0 %}+{% endif %}{{ movement.total_diff }}
+            </span>
+        </div>
+    </div>
+</div>
+
+{# График 1: Динамика движения персонала по месяцам #}
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-graph-up" style="color:var(--accent)"></i>
+        Динамика движения персонала — {{ movement.year }}
+    </div>
+    <div style="padding:20px;position:relative;height:440px">
+        <canvas id="chartMonthly"></canvas>
+    </div>
+</div>
+
+{# График 2: Текучесть по цехам + таблица топ-10 цехов с наибольшей текучестью #}
+<div class="row g-3 mb-4 align-items-stretch">
+    <div class="col-lg-7" style="min-width:0">
+        <div class="card" style="border-radius:10px;height:100%;display:flex;flex-direction:column">
+            <div class="card-header" style="border-radius:10px 10px 0 0">
+                <i class="bi bi-bar-chart-line" style="color:var(--accent)"></i>
+                Топ-10 цехов по текучести - {{ movement.year }}
+            </div>
+            <div style="padding:20px;position:relative;flex:1 1 0;min-height:400px">
+                <canvas id="chartWorkshops"></canvas>
+            </div>
+        </div>
+    </div>
+
+    {% if top_workshops %}
+    <div class="col-lg-5" style="min-width:0">
+        <div class="card" style="border-radius:10px;height:100%;overflow:hidden">
+            <div style="overflow-x:auto;max-width:100%">
+                <table class="table mb-0 ws-table" style="min-width:400px;table-layout:fixed">
+                    <colgroup>
+                        <col style="width:10%">
+                        <col style="width:28%">
+                        <col style="width:16%">
+                        <col style="width:14%">
+                        <col style="width:14%">
+                        <col style="width:18%">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Цех</th>
+                            <th>Производство</th>
+                            <th>Работало, <br>чел.</th>
+                            <th style="color:#16a34a">Принято</th>
+                            <th style="color:#dc2626">Уволено</th>
+                            <th>Коэф. <br>текучести</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ws in top_workshops %}
+                        <tr>
+                            <td style="font-weight:500;white-space:nowrap">{{ ws.number }}</td>
+                            <td style="color:var(--text-secondary)">{{ ws.production.name|default:"-" }}</td>
+                            <td>{{ ws.avg_count }}</td>
+                            <td style="color:#16a34a;font-weight:600">
+                                {% if ws.hired > 0 %}{{ ws.hired }}{% else %}-{% endif %}
+                            </td>
+                            <td style="color:#dc2626;font-weight:600">
+                                {% if ws.dismissed > 0 %}{{ ws.dismissed }}{% else %}-{% endif %}
+                            </td>
+                            <td>
+                                <span style="font-weight:700;padding:3px 9px;border-radius:12px;font-size:11px;white-space:nowrap;
+                                            background:{% if ws.turnover_rate > 20 %}rgba(220,38,38,.12){% elif ws.turnover_rate > 10 %}rgba(217,119,6,.12){% else %}rgba(22,163,74,.12){% endif %};
+                                            color:{% if ws.turnover_rate > 20 %}#dc2626{% elif ws.turnover_rate > 10 %}#d97706{% else %}#16a34a{% endif %}">
+                                    {{ ws.turnover_rate }}%
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{# График 3: Топ-5 причин увольнений + легенда #}
+{% if top_reasons %}
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-pie-chart" style="color:var(--accent)"></i>
+        Топ-5 причин увольнений - {{ movement.year }}
+    </div>
+    <div class="row g-0 align-items-center" style="padding:24px 20px">
+        <div class="col-lg-7">
+            <div style="position:relative;height:400px">
+                <canvas id="chartReasons"></canvas>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div id="shared-reasons-legend" 
+                 style="display:flex;flex-direction:column;gap:16px;padding-left:24px"></div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# График 5: Численность по производствам #}
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-building" style="color:var(--accent)"></i>
+        Численность по производствам
+    </div>
+    <div style="padding:20px;position:relative;height:640px">
+        <canvas id="chartHeadcount"></canvas>
+    </div>
+</div>
+
+{# JSON-данные для JS #}
+{{ top_reasons_names|json_script:"json-reason-order" }}
+
+<script id="json-workshops" type="application/json">
+[{% for ws in top_workshops %}{
+    "number": {{ ws.number }},
+    "rate": {{ ws.turnover_rate|stringformat:"g" }},
+    "dismissed": {{ ws.dismissed }}
+}{% if not forloop.last %},{% endif %}{% endfor %}]
+</script>
+
+<script id="json-headcount" type="application/json">
+{{ chart_headcount_json|safe }}
+</script>
+
+<style>
+/* Стили дашборда */
+.dash-card {;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    transition: box-shadow .15s;
+}
+.dash-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,.1);
+}
+.dash-card-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+.dash-card-num {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--text-primary);
+}
+.dash-card-lbl {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+.dash-sub-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    height: 100%;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+}
+.dash-sub-lbl {
+    font-size: 16px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    line-height: 1.25
+    margin-top: 2px;
+}
+.dash-sub-val {
+    font-size: 18px;
+    font-weight: 700;
+}
+/* Стиль таблицы */
+.ws-table th,
+.ws-table td {
+    padding: 3 px 8px;
+    text-align: center;
+    vertical-align: middle;
+    font-size: 12px;
+}
+.ws-table th {
+    line-height: 1.25;
+    font-weight: 600;
+}
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'vendors/chartjs/chart.umd.min.js' %}"></script>
+
+<script>
+/* Общие настройки Chart.js */
+Chart.defaults.font.family = "'Inter', 'Segoe UI', system-ui, sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.color = '#6b7280';
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+Chart.defaults.plugins.legend.labels.pointStyleWidth = 10;
+Chart.defaults.plugins.legend.labels.padding = 16;
+
+const TOOLTIP_STYLE = {
+    backgroundColor: 'rgba(15,23,42,0.92)',
+    titleFont: { weight: '600', size: 13 },
+    bodyFont: { size: 12 },
+    padding: 12,
+    cornerRadius: 8,
+    boxPadding: 4
+};
+
+/* Подпись значений на графике - численность над графиком */
+const valueLabels = {
+    id: 'valueLabels',
+    afterDatasetsDraw(chart) {
+        const ctx = chart.ctx;
+        const top = chart.chartArea.top;
+        ctx.save();
+        ctx.font = '600 12px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        
+        chart.data.datasets.forEach((ds, i) => {
+            const meta = chart.getDatasetMeta(i);
+            if (meta.hidden) return;
+
+            meta.data.forEach((el, idx) => {
+                const v = ds.data[idx];
+                if (v == null || v == undefined || v == '') return;
+                
+                if (meta.type == 'line') {
+                    /* Пунктирная линия от числа к кривой */
+                    const slot = chart.chartArea.width / meta.data.length;
+                    const twoRows = slot < 30;
+                    const y = (twoRows && idx % 2) ? top - 20 : top - 6;
+
+                    ctx.save();
+                    ctx.setLineDash([3, 3]);
+                    ctx.lineWidth = 1;
+                    ctx.strokeStyle = 'rgba(37,99,235,0.5)';
+                    ctx.beginPath();
+                    ctx.moveTo(el.x, el.y -6);
+                    ctx.lineTo(el.x, y + 2);
+                    ctx.stroke();
+                    ctx.restore();
+
+                    /* Число над графиком*/
+                    ctx.textBaseline = 'bottom';
+                    ctx.fillStyle = '#2563eb';
+                    ctx.fillText(v, el.x, y);
+                } else {
+                    if (!v) return;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+                    ctx.fillStyle = ds.borderColor || '#374151';
+                    ctx.fillText(v, el.x, el.y - 3);
+                }
+            });
+        });
+        ctx.restore();
+    }
+};
+
+const legendSpacer = {
+    id: 'legendSpacer',
+    beforeInit(chart) {
+        const originalFit = chart.legend.fit;
+        chart.legend.fit = function() {
+            originalFit.call(this);
+            this.height += 26;
+        };
+    }
+};
+
+/* Подписи на обычных столбцах (с необязательным суффиксом) */
+const workshopBarLabels = (dismissedArr) => ({
+    id: 'workshopBarLabels',
+    afterDatasetsDraw(chart) {
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.textAlign = 'center';
+
+        chart.data.datasets.forEach((ds, i) => {
+            const meta = chart.getDatasetMeta(i);
+            if (meta.hidden) return;
+            meta.data.forEach((el, idx) => {
+                const v = ds.data[idx];
+                if (v == null || v === 0) return;
+                
+                /* Процент текучести над столбцом */
+                ctx.font = '600 14px Inter, sans-serif';
+                ctx.textBaseline = 'bottom';
+                ctx.fillStyle = '#374151';
+                ctx.fillText(v + '%', el.x, el.y - 5);
+
+                /* Число уволенных в середине столбца */
+                const d = dismissedArr[idx];
+                if (!d) return;
+                const barHeight = Math.abs(el.base - el.y);
+                if (barHeight < 34) return;
+                ctx.font = '700 14px Inter, sans-serif';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(d + ' чел.', el.x, (el.base +el.y) / 2);
+            });
+        });
+        ctx.restore();
+    }
+});
+
+/* Подписи внутри сегментов стопки + итог над столбцом */
+const stackedValueLabels = {
+    id: 'stackedValueLabels',
+    afterDatasetsDraw(chart) {
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.textAlign = 'center';
+        
+        /* Значения внутри сегментов: количество + процент */
+        chart.data.datasets.forEach((ds, i) => {
+            const meta = chart.getDatasetMeta(i);
+            if (meta.hidden) return;
+            meta.data.forEach((el, idx) => {
+                const v = ds.data[idx];
+                if (!v) return;
+                if (Math.abs(el.base - el.y) < 30) return;
+
+                let colTotal = 0
+                chart.data.datasets.forEach((ds2, i2) => {
+                    const meta2 = chart.getDatasetMeta(i2);
+                    if (meta2.hidden) return;
+                    colTotal += (ds2.data[idx] || 0);
+                });
+                const pct = colTotal ? Math.round(v / colTotal * 100) : 0;
+                const cy = (el.base + el.y) / 2;
+
+                ctx.font = '600 16px Inter, sans-serif';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#1f2937';
+                ctx.fillText(v, el.x, cy - 8);
+
+                ctx.font = '500 14px Inter, sans-serif';
+                ctx.fillStyle = 'rgba(31,41,55,0.75)';
+                ctx.fillText(pct + '%', el.x, cy + 9);
+            });
+        });
+
+        /* Итог над столбцом */
+        ctx.font = '700 18px Inter, sans-serif';
+        ctx.textBaseline = 'middle';
+        for (let idx = 0; idx < chart.data.labels.length; idx++) {
+            let sum = 0, topY = Infinity, x = 0;
+            chart.data.datasets.forEach((ds, i) => {
+                const meta = chart.getDatasetMeta(i);
+                if (meta.hidden) return;
+                sum += (ds.data[idx] || 0);
+                const el = meta.data[idx];
+                if (el && el.y < topY) { topY = el.y; x = el.x; }
+            });
+            if (!sum) continue;
+
+            const label = String(sum);
+            const w = ctx.measureText(label).width + 20;
+            const h = 30;
+            const cy = topY - 18;
+
+            ctx.fillStyle = '#1f2937';
+            ctx.beginPath();
+            ctx.roundRect(x - w / 2, cy - h / 2, w, h, 15);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(label, x, cy);
+        }
+        ctx.restore();
+    }
+};
+
+/* Подписи на секторах кольцевой диаграммы */
+const doughnutValueLabels = {
+    id: 'doughnutValueLabels',
+    afterDatasetsDraw(chart) {
+        const ctx = chart.ctx;
+        const meta = chart.getDatasetMeta(0);
+        const data = chart.data.datasets[0].data;
+
+        let total = 0;
+        data.forEach((v, i) => { if (chart.getDataVisibility(i)) total += v; });
+
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        meta.data.forEach((el, i) => {
+            const v = data[i];
+            if (!v || !chart.getDataVisibility(i)) return;
+            const pct = total ? (v / total * 100) : 0;
+            if (pct < 4) return;
+            const pos = el.tooltipPosition();
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '700 16px Inter, sans-serif';
+            ctx.fillText(v, pos.x, pos.y - 9);
+            ctx.font = '500 14px Inter, sans-serif';
+            ctx.fillText(pct.toFixed(1) + '%', pos.x, pos.y + 10);
+        });
+        ctx.restore();
+    }
+};
+
+/* График 1: Помесячная динамика */
+(function() {
+    const labels = [{% for row in movement.monthly_rows %}'{{ row.month }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+    const hired = [{% for row in movement.monthly_rows %}{{ row.hired }}{% if not forloop.last %},{% endif %}{% endfor %}];
+    const dismissed = [{% for row in movement.monthly_rows %}{{ row.dismissed }}{% if not forloop.last %},{% endif %}{% endfor %}];
+    const headcount = [{% for row in movement.monthly_rows %}{{ row.headcount }}{% if not forloop.last %},{% endif %}{% endfor %}];
+
+    const ctx = document.getElementById('chartMonthly');
+    if (!ctx) return;
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Принято',
+                    data: hired,
+                    backgroundColor: 'rgba(22,163,74,0.72)',
+                    borderColor: '#16a34a',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    order: 2
+                },
+                {
+                    label: 'Уволено',
+                    data: dismissed,
+                    backgroundColor: 'rgba(220,38,38,0.72)',
+                    borderColor: '#dc2626',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    order: 2
+                },
+                {
+                    label: 'Численность',
+                    data: headcount,
+                    type: 'line',
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37,99,235,0.06)',
+                    borderWidth: 2.5,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#2563eb',
+                    fill: true,
+                    tension: 0.35,
+                    yAxisID: 'y1',
+                    order: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'top', labels: { font: { size: 14 }, boxWidth: 16, padding: 14 } },
+                },
+            scales: {
+                x: { grid: { display: false } },
+                y: {
+                    title: { display: true, text: 'Принято / Уволено, чел.' },
+                    beginAtZero: true,
+                    grace: '12%',
+                    grid: { color: 'rgba(0,0,0,0.04)' }
+                },
+                y1: {
+                    position: 'right',
+                    title: { display: true, text: 'Численность, чел.' },
+                    grid: { drawOnChartArea: false },
+                    beginAtZero: false
+                }
+            }
+        },
+        plugins: [legendSpacer, valueLabels]
+    });
+})();
+
+/* График 2: Текучесть по цехам */
+(function() {
+    const workshops = JSON.parse(document.getElementById('json-workshops')?.textContent || '[]');
+    if (!workshops.length) return;
+
+    const labels = workshops.map(w => 'Цех ' + w.number);
+    const rates = workshops.map(w => w.rate);
+    const colors = rates.map(r => r > 20 ? 'rgba(220,38,38,0.75)' : r > 10 ? 'rgba(217,119,6,0.75)' : 'rgba(22,163,74,0.75)');
+
+    const ctx = document.getElementById('chartWorkshops');
+    if (!ctx) return;
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Текучесть, %',
+                data: rates,
+                backgroundColor: colors,
+                borderRadius: 4,
+                borderSkipped: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    ...TOOLTIP_STYLE,
+                    callbacks: { label: ctx => ' Текучесть: ' + ctx.parsed.y + '%' }
+                }
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 14 } } },
+                y: {
+                    title: { display: true, text: 'Коэффициент текучести, %', font: { size: 14 } },
+                    beginAtZero: true,
+                    grace: '12%',
+                    ticks: { font: { size: 14 } },
+                    grid: { color: 'rgba(0,0,0,0.04)' }
+                }
+            }
+        },
+        plugins: [workshopBarLabels(workshops.map(w => w.dismissed)), {
+            id: 'thresholdLines',
+            afterDraw(chart) {
+                const yAxis = chart.scales.y;
+                const ctx2 = chart.ctx;
+                [10, 20].forEach((val, i) => {
+                    if (val > yAxis.max) return;
+                    const y = yAxis.getPixelForValue(val);
+                    ctx2.save();
+                    ctx2.strokeStyle = i === 0 ? '#d97706' : '#dc2626';
+                    ctx2.lineWidth = 1.5;
+                    ctx2.setLineDash([6, 4]);
+                    ctx2.beginPath();
+                    ctx2.moveTo(chart.chartArea.left, y);
+                    ctx2.lineTo(chart.chartArea.right, y);
+                    ctx2.stroke();
+                    ctx2.fillStyle = ctx2.strokeStyle;
+                    ctx2.font = '11px Inter, sans-serif';
+                    ctx2.textAlign = 'right';
+                    ctx2.fillText(val + '%', chart.chartArea.right + 36, y + 4);
+                    ctx2.restore();
+                });
+            }
+        }]
+    });
+})();
+
+/* Палитра причин увольнений (график 3) */
+const REASON_PALETTE = [
+    '#6b8cae','#8fae6b','#ae8f6b','#6bae9f','#9f6bae',
+    '#ae6b86','#6ba2ae','#7a9e5c','#c2956b','#5c7a9e',
+    '#9e5c7a','#5c9e8a','#8a5c9e','#9e8a5c','#5c8a9e'
+];
+const reasonOrder = JSON.parse(document.getElementById('json-reason-order')?.textContent || '[]');
+
+/* График 3: Причины увольнений */
+(function() {
+    const labels = [{% for r in top_reasons %}'{{ r.dismissal_reason__name }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+    const values = [{% for r in top_reasons %}{{ r.count }}{% if not forloop.last %},{% endif %}{% endfor %}];
+
+    if (!labels.length) return;
+
+    const ctx = document.getElementById('chartReasons');
+    if (!ctx) return;
+
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels,
+            datasets: [{
+                data: values,
+                backgroundColor: labels.map((_, i) => REASON_PALETTE[i % REASON_PALETTE.length]),
+                borderWidth: 2,
+                borderColor: '#ffffff',
+                hoverOffset: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '55%',
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    ...TOOLTIP_STYLE,
+                    callbacks: {
+                        label(ctx) {
+                            let total = 0;
+                            ctx.dataset.data.forEach((v, i) => {
+                                if (ctx.chart.getDataVisibility(i)) total += v;
+                            });
+                            const pct = total ? (ctx.parsed / total * 100).toFixed(1) : 0;
+                            return ' ' + ctx.label + ': ' + ctx.parsed + ' (' + pct + '%)';
+                        }
+                    }
+                }
+            }
+        },
+        plugins: [doughnutValueLabels, {
+            id: 'centerText',
+            afterDraw(chart) {
+                let total = 0;
+                chart.data.datasets[0].data.forEach((v, i) => {
+                    if (chart.getDataVisibility(i)) total += v;
+                });
+                const { width, height, top, left } = chart.chartArea;
+                const ctx2 = chart.ctx;
+                ctx2.save();
+                ctx2.textAlign = 'center';
+                ctx2.textBaseline = 'middle';
+                const cx = left + width / 2;
+                const cy = top + height / 2;
+                ctx2.font = 'bold 26px Inter, sans-serif';
+                ctx2.fillStyle = '#1f2937';
+                ctx2.fillText(total, cx, cy - 8);
+                ctx2.font = '14px Inter, sans-serif';
+                ctx2.fillStyle = '#6b7280';
+                ctx2.fillText('уволено', cx, cy + 14);
+                ctx2.restore();
+            }
+        }]
+    });
+})();
+
+/* Легенда причин увольнений с переключением сегментов */
+(function() {
+    const container = document.getElementById('shared-reasons-legend');
+    if (!container || !reasonOrder.length) return;
+
+    const chart = Chart.getChart('chartReasons');
+    if (!chart) return;
+
+    reasonOrder.forEach((reason, i) => {
+        const isOther = reason === 'Прочие причины';
+
+        const item = document.createElement('span');
+        item.style.cssText = 'display:inline-flex;align-items:center;gap:12px;font-size:18px;' +
+                             'color:var(--text-primary);line-height:1.35;cursor:pointer;user-select:none;' +
+                             'transition:opacity .15s';
+
+        const dot = document.createElement('span');
+        dot.style.cssText = 'width:22px;height:22px;border-radius:5px;flex-shrink:0;' +
+                            'background:' + REASON_PALETTE[i % REASON_PALETTE.length];
+
+        const text = document.createElement('span');
+        text.textContent = reason;
+
+        item.appendChild(dot);
+        item.appendChild(text);
+        container.appendChild(item);
+
+        /* Прочие скрыты по умолчанию */
+        const applyState = (hidden) => {
+            item.style.opacity = hidden ? '0.35' : '1';
+            text.style.textDecoration = hidden ? 'line-through' : 'none';
+        };
+
+        if (isOther) {
+            chart.toggleDataVisibility(i);
+            applyState(true);
+        }
+
+        item.addEventListener('click', () => {
+            chart.toggleDataVisibility(i);
+            chart.update();
+            applyState(!chart.getDataVisibility(i));
+        });
+    });
+
+    chart.update();
+})();
+
+/* График 5: Численность по производствам */
+(function() {
+    const raw = JSON.parse(document.getElementById('json-headcount')?.textContent || '{}');
+    if (!raw.productions || !raw.productions.length) return;
+
+    const ctx = document.getElementById('chartHeadcount');
+    if (!ctx) return;
+
+    const CAT_COLORS = [
+        'rgba(107,140,174,0.7)','rgba(143,174,107,0.7)','rgba(174,143,107,0.7)',
+        'rgba(107,174,159,0.7)','rgba(159,107,174,0.7)','rgba(174,107,134,0.7)',
+        'rgba(107,162,174,0.7)','rgba(122,158,92,0.7)','rgba(194,149,107,0.7)'
+    ];
+
+    const datasets = raw.categories.map((cat, i) => ({
+        label: cat,
+        data: raw.productions.map(p => p.categories[cat] || 0),
+        backgroundColor: CAT_COLORS[i % CAT_COLORS.length],
+        borderRadius: 4,
+        borderSkipped: false
+    }));
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: raw.productions.map(p => p.name),
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: { font: { size: 14 }, boxWidth: 16, padding: 14 }
+                },
+                tooltip: {
+                    ...TOOLTIP_STYLE,
+                    callbacks: { label: ctx => ' ' + ctx.dataset.label + ': ' + ctx.parsed.y + ' чел.' }
+                }
+            },
+            scales: {
+                x: { stacked: true, grid: { display: false }, ticks: { display: true, font: { size:14 } } },
+                y: { stacked: true, title: { display: true, text: 'Численность, чел.', font: { size:14 } }, beginAtZero: true, ticks: { font: { size:15 } }, grid: { color: 'rgba(0,0,0,0.04)' } }
+            }
+        },
+        plugins: [stackedValueLabels]
+    });
+})();
+</script>
+{% endblock %}

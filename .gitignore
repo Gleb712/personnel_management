@@ -1,0 +1,12 @@
+/.idea
+/.venv
+/.vscode
+*.csv
+*.xlsx
+/wheels
+/staticfiles
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env

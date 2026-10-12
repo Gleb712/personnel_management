@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+{% block title %}Загрузка файлов{% endblock %}
+{% block page_title %}Загрузка данных{% endblock %}
+{% block nav_upload %}active{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'core:employee_list' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-people me-1"></i>К списку сотрудников
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+    <!-- Левая колонка: форма -->
+    <div class="col-xl-7">
+        <form method="post" enctype="multipart/form-data" id="upload-form">
+            {% csrf_token %}
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-cloud-upload" style="color:var(--accent)"></i>
+                    Загрузка файла
+                    <div class="ms-auto form-check form-switch m-0 d-flex align-items-center">
+                        {% comment %} <input class="form-check-input m-0" type="checkbox" id="fileTypeSwitch" name="file_type" value="transfers">
+                        <label class="form-check-label ms-2 mb-0" for="fileTypeSwitch">Переводы</label> {% endcomment %}
+                        <select name="file_type">
+                            {% for key, value in file_type.items %}
+                                <option value="{{ key }}">{{ value }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- <form method="post" enctype="multipart/form-data" id="upload-form"> -->
+
+                        <!-- Drop zone -->
+                        <div id="drop-zone"
+                            style="border:2px dashed var(--border);border-radius:10px;padding:40px 20px;
+                                    text-align:center;cursor:pointer;transition:all .2s;margin-bottom:20px;"
+                            onclick="document.getElementById('id_file').click()">
+                            <i class="bi bi-file-earmark-spreadsheet"
+                            style="font-size:40px;color:var(--text-muted);display:block;margin-bottom:10px"></i>
+                            <div style="font-weight:600;color:var(--text-primary);margin-bottom:4px">
+                                Перетащите файл сюда
+                            </div>
+                            <div style="font-size:12px;color:var(--text-muted)">
+                                или нажмите для выбора · XLSX, XLS · до 10 МБ
+                            </div>
+                            <div id="file-name-label"
+                                style="display:none;margin-top:12px;font-size:12px;
+                                        color:var(--accent);font-weight:500"></div>
+                        </div>
+
+                        <!-- Скрытый input -->
+                        <div style="display:none">{{ form.file }}</div>
+                        {% if form.file.errors %}
+                            <div style="color:#f87171;font-size:12px;margin-top:-12px;margin-bottom:14px">
+                                {{ form.file.errors|join:", " }}
+                            </div>
+                        {% endif %}
+
+                        <button type="submit" class="btn btn-primary w-100" id="submit-btn">
+                            <i class="bi bi-upload me-1"></i> Загрузить файл
+                        </button>
+                    <!-- </form> -->
+                </div>
+            </div>
+        </form>
+
+        <!-- Ошибки строк -->
+        {% if errors %}
+        <div class="card mt-4">
+            <div class="card-header" style="color:#f87171">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                Ошибки при загрузке — {{ errors|length }} строк
+            </div>
+            <div style="max-height:260px;overflow-y:auto;">
+                {% for error in errors %}
+                <div style="padding:8px 18px;border-bottom:1px solid var(--border);
+                            font-size:12px;color:var(--text-secondary);">
+                    <i class="bi bi-x-circle me-1" style="color:#f87171"></i>{{ error }}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Правая колонка: справка -->
+    <div class="col-xl-5">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle" style="color:var(--accent)"></i>
+                Требования к файлу
+            </div>
+            <div class="card-body">
+
+                <div style="margin-bottom:16px">
+                    <!-- <div class="stat-lbl" style="margin-bottom:6px">Форматы</div>
+                    <span class="badge bg-secondary me-1">CSV</span> -->
+                    <span class="badge bg-success me-1">XLSX</span>
+                    <span class="badge bg-success">XLS</span>
+                </div>
+
+                <div style="margin-bottom:16px">
+                    <div class="stat-lbl badge text-bg-warning" style="margin-bottom:8px">
+                        Обязательные колонки
+                    </div>
+                    {% for col in required_columns %}
+                    <div style="font-size:12px;padding:5px 0;color:var(--text-primary);
+                                border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px">
+                        <i class="bi bi-asterisk" style="color:#ef4444;font-size:9px"></i>{{ col }}
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div>
+                    <div class="stat-lbl" style="margin-bottom:8px">Необязательные колонки</div>
+                    {% for col in optional_columns %}
+                    <div style="font-size:12px;padding:5px 0;color:var(--text-secondary);
+                                border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px">
+                        <i class="bi bi-dash" style="color:var(--text-muted)"></i>{{ col }}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="bi bi-table" style="color:#22c55e"></i>
+                Пример структуры файла
+            </div>
+            <div style="overflow-x:auto">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>ФИО</th>
+                            <th>Табельный номер</th>
+                            <th>Дата приёма</th>
+                            <th>Цех</th>
+                            <th>Пол</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="font-size:12px">Иванов И.И.</td>
+                            <td><code>12345</code></td>
+                            <td style="font-size:12px">2020-01-10</td>
+                            <td style="font-size:12px">100</td>
+                            <td style="font-style:12">Мужской</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('id_file');
+const label    = document.getElementById('file-name-label');
+
+function setFile(file) {
+    if (!file) return;
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    fileInput.files = dt.files;
+    label.textContent = '📄 ' + file.name;
+    label.style.display = 'block';
+    dropZone.style.borderColor = 'var(--accent)';
+    dropZone.style.background  = 'var(--accent-dim)';
+}
+
+fileInput.addEventListener('change', () => setFile(fileInput.files[0]));
+
+['dragover','dragenter'].forEach(ev => dropZone.addEventListener(ev, e => {
+    e.preventDefault();
+    dropZone.style.borderColor = 'var(--accent)';
+    dropZone.style.background  = 'var(--accent-dim)';
+}));
+['dragleave','dragend'].forEach(ev => dropZone.addEventListener(ev, () => {
+    if (!fileInput.files[0]) {
+        dropZone.style.borderColor = 'var(--border)';
+        dropZone.style.background  = '';
+    }
+}));
+dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    setFile(e.dataTransfer.files[0]);
+});
+
+document.getElementById('upload-form').addEventListener('submit', function() {
+    const btn = document.getElementById('submit-btn');
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Загрузка...';
+    btn.disabled = true;
+});
+</script>
+{% endblock %}

@@ -1,0 +1,165 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход — HR Analytics</title>
+    <link href="{% static 'vendors/bootstrap-5.3.8/css/bootstrap.min.css' %}" rel="stylesheet">
+    <link href="{% static 'vendors/bootstrap-icons-1.11.3/font/bootstrap-icons.min.css' %}" rel="stylesheet">
+    <link href="{% static 'vendors/fonts/inter.css' %}" rel="stylesheet">
+    <style>
+        :root {
+            --accent:        #e07b2a;
+            --accent-hover:  #c96a1e;
+            --surface:       #ffffff;
+            --surface-2:     #f4f4f4;
+            --border:        #e0e0e0;
+            --border-strong: #cccccc;
+            --text-primary:   #111111;
+            --text-secondary: #555555;
+            --text-muted:     #999999;
+        }
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f4f4f4;
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .login-wrap {
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+        }
+
+        .login-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 32px;
+        }
+        .logo-icon {
+            width: 44px; height: 44px;
+            background: var(--accent);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 20px;
+        }
+        .logo-text .logo-title { font-weight: 700; font-size: 18px; color: var(--text-primary); }
+        .logo-text .logo-sub   { font-size: 12px; color: var(--text-muted); }
+
+        .login-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 32px;
+            box-shadow: 0 2px 8px rgba(0,0,0,.07);
+        }
+        .login-card h2 {
+            font-size: 18px; font-weight: 600;
+            margin-bottom: 6px; color: var(--text-primary);
+        }
+        .login-card .subtitle {
+            font-size: 13px; color: var(--text-secondary);
+            margin-bottom: 28px;
+        }
+
+        .form-label {
+            font-size: 12px; font-weight: 500;
+            color: var(--text-secondary); margin-bottom: 5px;
+        }
+        .form-control {
+            background: var(--surface-2) !important;
+            border: 1px solid var(--border-strong) !important;
+            color: var(--text-primary) !important;
+            font-size: 14px; border-radius: 8px;
+            padding: 10px 14px;
+        }
+        .form-control::placeholder { color: var(--text-muted); }
+        .form-control:focus {
+            border-color: var(--accent) !important;
+            box-shadow: 0 0 0 3px rgba(224,123,42,.15) !important;
+        }
+
+        .btn-login {
+            width: 100%;
+            background: var(--accent);
+            border: none;
+            color: white;
+            font-size: 14px; font-weight: 600;
+            padding: 11px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: background .15s;
+        }
+        .btn-login:hover { background: var(--accent-hover); }
+
+        .error-msg {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 13px;
+            margin-bottom: 20px;
+            display: flex; align-items: center; gap: 8px;
+        }
+    </style>
+</head>
+<body>
+<div class="login-wrap">
+
+    <div class="login-logo">
+        <div class="logo-icon"><i class="bi bi-people-fill"></i></div>
+        <div class="logo-text">
+            <div class="logo-title">HR Analytics</div>
+            <div class="logo-sub">Управление персоналом</div>
+        </div>
+    </div>
+
+    <div class="login-card">
+        <h2>Вход в систему</h2>
+        <p class="subtitle">Введите логин и пароль для продолжения</p>
+
+        {% if messages %}
+            {% for message in messages %}
+            <div class="error-msg">
+                <i class="bi bi-exclamation-circle-fill"></i>
+                {{ message }}
+            </div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post" autocomplete="off">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label class="form-label" for="id_username">Логин</label>
+                <input type="text" name="username" id="id_username"
+                       class="form-control" placeholder="Введите логин"
+                       autofocus autocomplete="username">
+            </div>
+            <div class="mb-4">
+                <label class="form-label" for="id_password">Пароль</label>
+                <input type="password" name="password" id="id_password"
+                       class="form-control" placeholder="Введите пароль"
+                       autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn-login">
+                <i class="bi bi-box-arrow-in-right me-2"></i>Войти
+            </button>
+        </form>
+    </div>
+
+</div>
+<script src="{% static 'vendors/bootstrap-5.3.8/js/bootstrap.bundle.min.js' %}"></script>
+</body>
+</html>

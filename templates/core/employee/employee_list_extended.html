@@ -1,0 +1,259 @@
+{% extends 'base.html' %}
+{% block title %}Подбор персонала{% endblock %}
+{% block page_title %}Подбор персонала{% endblock %}
+{% block nav_employees_extended %}active{% endblock %}
+{% block nav_employees %}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'core:upload_file' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-upload me-1"></i>Загрузить файл
+</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Фильтры -->
+<div class="card mb-4">
+    <div class="card-body" style="padding:14px 18px">
+        <div class="row g-2 align-items-end" id="filters-container">
+            <div class="col-md-3">
+                <label class="form-label">ФИО или табельный номер</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" 
+                           class="form-control" 
+                           name="search"
+                           value="{{ search }}" 
+                           placeholder="Иванов Иван Иванович"
+                           hx-get="{% url 'core:employee_list_extended' %}"
+                           hx-target="#table-wrap"
+                           hx-trigger="keyup changed delay:350ms"
+                           hx-include="[name='search'],[name='position'],[name='category'],[name='production'],[name='workshop'],[name='status'],[name='per_page'],[name='gender'],[name='age_from'],[name='age_to'],[name='tenure_from'],[name='tenure_to']"
+                           hx-push-url="true">
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Должность</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" 
+                           class="form-control" 
+                           name="position"
+                           value="{{ position }}" 
+                           placeholder="Инженер"
+                           hx-get="{% url 'core:employee_list_extended' %}"
+                           hx-target="#table-wrap"
+                           hx-trigger="keyup changed delay:350ms"
+                           hx-include="[name='search'],[name='position'],[name='category'],[name='production'],[name='workshop'],[name='status'],[name='per_page'],[name='gender'],[name='age_from'],[name='age_to'],[name='tenure_from'],[name='tenure_to']"
+                           hx-push-url="true">
+                </div>
+            </div>
+
+            <div class="col-md-1">
+                <label class="form-label">Категория</label>
+                <select class="form-select form-select-sm" 
+                        name="category"
+                        hx-get="{% url 'core:employee_list_extended' %}"
+                        hx-target="#table-wrap"
+                        hx-trigger="change"
+                        hx-include="[name='search'],[name='position'],[name='category'],[name='production'],[name='workshop'],[name='status'],[name='per_page'],[name='gender'],[name='age_from'],[name='age_to'],[name='tenure_from'],[name='tenure_to']"
+                        hx-push-url="true">
+                    <option value="">Все</option>
+                    {% for c in employee_categories %}
+                    <option value="{{ c.id }}" {% if selected_category|stringformat:"s" == c.id|stringformat:"s" %}selected{% endif %}>
+                        {{ c.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">Производство</label>
+                <select class="form-select form-select-sm" 
+                        name="production"
+                        hx-get="{% url 'core:employee_list_extended' %}"
+                        hx-target="#table-wrap"
+                        hx-trigger="change"
+                        hx-include="[name='search'],[name='position'],[name='category'],[name='production'],[name='workshop'],[name='status'],[name='per_page'],[name='gender'],[name='age_from'],[name='age_to'],[name='tenure_from'],[name='tenure_to']"
+                        hx-push-url="true">
+                    <option value="">Все</option>
+                    {% for p in productions %}
+                    <option value="{{ p.id }}" {% if selected_production|stringformat:"s" == p.id|stringformat:"s" %}selected{% endif %}>
+                        {{ p.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-1">
+                <label class="form-label">Цех</label>
+                <select class="form-select form-select-sm" 
+                        name="workshop"
+                        hx-get="{% url 'core:employee_list_extended' %}"
+                        hx-target="#table-wrap"
+                        hx-trigger="change"
+                        hx-include="[name='search'],[name='position'],[name='category'],[name='production'],[name='workshop'],[name='status'],[name='per_page'],[name='gender'],[name='age_from'],[name='age_to'],[name='tenure_from'],[name='tenure_to']"
+                        hx-push-url="true">
+                    <option value="">Все</option>
+                    {% for w in workshops %}
+                    <option value="{{ w.id }}" {% if selected_workshop|stringformat:"s" == w.id|stringformat:"s" %}selected{% endif %}>
+                        {{ w.number }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-1">
+                <label class="form-label">Статус</label>
+                <select class="form-select form-select-sm" 
+                        name="status"
+                        hx-get="{% url 'core:employee_list_extended' %}"
+                        hx-target="#table-wrap"
+                        hx-trigger="change"
+                        hx-include="[name='search'],[name='position'],[name='category'],[name='production'],[name='workshop'],[name='status'],[name='per_page'],[name='gender'],[name='age_from'],[name='age_to'],[name='tenure_from'],[name='tenure_to']"
+                        hx-push-url="true">
+                    <option value="">Все</option>
+                    <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Работают</option>
+                    <option value="dismissed" {% if selected_status == 'dismissed' %}selected{% endif %}>Уволены</option>
+                </select>
+            </div>
+
+            <div class="col-md-1" style="max-width:70px;">
+                <label class="form-label">Строк</label>
+                <select class="form-select form-select-sm" 
+                        name="per_page"
+                        hx-get="{% url 'core:employee_list_extended' %}"
+                        hx-target="#table-wrap"
+                        hx-trigger="change"
+                        hx-include="[name='search'],[name='position'],[name='category'],[name='production'],[name='workshop'],[name='status'],[name='per_page'],[name='gender'],[name='age_from'],[name='age_to'],[name='tenure_from'],[name='tenure_to']"
+                        hx-push-url="true">
+                    {% for opt in per_page_options %}
+                    <option value="{{ opt }}" {% if per_page == opt %}selected{% endif %}>{{ opt }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="col-md-1" style="min-width:110px;">
+                <label class="form-label">Пол</label>
+                <select class="form-select form-select-sm" 
+                        name="gender"
+                        hx-get="{% url 'core:employee_list_extended' %}"
+                        hx-target="#table-wrap"
+                        hx-trigger="change"
+                        hx-include="[name='search'],[name='position'],[name='category'],[name='production'],[name='workshop'],[name='status'],[name='per_page'],[name='gender'],[name='age_from'],[name='age_to'],[name='tenure_from'],[name='tenure_to']"
+                        hx-push-url="true">
+                    <option value="">Все</option>
+                    <option value="Мужской" {% if gender == 'Мужской' %}selected{% endif %}>Мужской</option>
+                    <option value="Женский" {% if gender == 'Женский' %}selected{% endif %}>Женский</option>
+                </select>
+            </div>
+
+            <!-- Возраст от / до -->
+            <div class="col-md-auto">
+                <label class="form-label">Возраст, лет</label>
+                <div class="input-group input-group-sm" style="width:160px;">
+                    <input type="number" 
+                           class="form-control" 
+                           name="age_from"
+                           value="{{ age_from }}" 
+                           placeholder="от"
+                           min="18" 
+                           max="100"
+                           hx-get="{% url 'core:employee_list_extended' %}"
+                           hx-target="#table-wrap"
+                           hx-trigger="keyup changed delay:350ms"
+                           hx-include="[name='search'],[name='position'],[name='category'],[name='production'],[name='workshop'],[name='status'],[name='per_page'],[name='gender'],[name='age_from'],[name='age_to'],[name='tenure_from'],[name='tenure_to']"
+                           hx-push-url="true">
+                    <span class="input-group-text" style="padding:0 6px;">—</span>
+                    <input type="number" 
+                           class="form-control" 
+                           name="age_to"
+                           value="{{ age_to }}" 
+                           placeholder="до"
+                           min="18" 
+                           max="100"
+                           hx-get="{% url 'core:employee_list_extended' %}"
+                           hx-target="#table-wrap"
+                           hx-trigger="keyup changed delay:350ms"
+                           hx-include="[name='search'],[name='position'],[name='category'],[name='production'],[name='workshop'],[name='status'],[name='per_page'],[name='gender'],[name='age_from'],[name='age_to'],[name='tenure_from'],[name='tenure_to']"
+                           hx-push-url="true">
+                </div>
+            </div>
+
+            <!-- Стаж от / до -->
+            <div class="col-md-auto">
+                <label class="form-label">Стаж, лет</label>
+                <div class="input-group input-group-sm" style="width:160px;">
+                    <input type="number" 
+                           class="form-control" 
+                           name="tenure_from"
+                           value="{{ tenure_from }}" 
+                           placeholder="от"
+                           min="0" 
+                           max="60"
+                           hx-get="{% url 'core:employee_list_extended' %}"
+                           hx-target="#table-wrap"
+                           hx-trigger="keyup changed delay:350ms"
+                           hx-include="[name='search'],[name='position'],[name='category'],[name='production'],[name='workshop'],[name='status'],[name='per_page'],[name='gender'],[name='age_from'],[name='age_to'],[name='tenure_from'],[name='tenure_to']"
+                           hx-push-url="true">
+                    <span class="input-group-text" style="padding:0 6px;">—</span>
+                    <input type="number" 
+                           class="form-control" 
+                           name="tenure_to"
+                           value="{{ tenure_to }}" 
+                           placeholder="до"
+                           min="0" 
+                           max="60"
+                           hx-get="{% url 'core:employee_list_extended' %}"
+                           hx-target="#table-wrap"
+                           hx-trigger="keyup changed delay:350ms"
+                           hx-include="[name='search'],[name='position'],[name='category'],[name='production'],[name='workshop'],[name='status'],[name='per_page'],[name='gender'],[name='age_from'],[name='age_to'],[name='tenure_from'],[name='tenure_to']"
+                           hx-push-url="true">
+                </div>
+            </div>
+
+            <!-- Кнопка сброса -->
+            <div class="col-md-1">
+                <label class="form-label" style="visibility:hidden;">—</label>
+                <button type="button" 
+                        class="btn btn-outline-secondary btn-sm d-block"
+                        id="reset-filters-btn">
+                    <i class="bi bi-x me-1"></i>Сбросить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Таблица -->
+<div id="table-wrap">
+    {% include 'core/employee/partials/employee_table_extended.html' %}
+</div>
+
+<script>
+    // Обработчик кнопки сброса
+    document.getElementById('reset-filters-btn').addEventListener('click', function() {
+        // Находим все поля ввода в фильтрах
+        const inputs = document.querySelectorAll('#filters-container input, #filters-container select');
+        
+        // Сбрасываем значения всех полей
+        inputs.forEach(input => {
+            if (input.type === 'text' || input.type === 'number') {
+                input.value = '';
+            } else if (input.tagName === 'SELECT') {
+                input.value = '';
+            }
+        });
+        
+        // Отправляем HTMX запрос на сброс
+        htmx.ajax('GET', "{% url 'core:employee_list_extended' %}", {
+            target: '#table-wrap',
+            swap: 'innerHTML',
+            headers: {
+                'HX-Request': 'true'
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,356 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load core_extras %}
+{% block title %}{{ data.details_type }} на {{ data.details_date }}{% endblock %}
+{% block page_title %}{{ data.details_type }} на {{ data.details_date }}{% endblock %}
+
+{% block content %}
+
+<!-- Итоговые карточки -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-num">{{ data.stats.employees_stats.total_emps|default:0 }}</div>
+            <div class="stat-lbl">Списочная численность</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-num">{{ data.stats.employees_stats.avg_age|default:0 }}</div>
+            <div class="stat-lbl">Средний возраст, лет</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-num">{{ data.stats.trainees_total|default:0 }}</div>
+            <div class="stat-lbl">Практика, всего</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-num">{{ data.stats.outstaffers_total|default:0 }}</div>
+            <div class="stat-lbl">Кадровые агентства</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+
+    <!-- Практика -->
+    <div class="col-12 col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-mortarboard" style="color:var(--accent)"></i>
+                Практика
+            </div>
+            <div class="card-body">
+                <ul class="info-list">
+                    <li><span class="info-key">СПО</span><span class="info-val">{{ data.stats.trainees_ve|default:0 }} чел.</span></li>
+                    <li><span class="info-key">ЦПП</span><span class="info-val">{{ data.stats.trainees_tc|default:0 }} чел.</span></li>
+                    <li><span class="info-key">Всего</span><span class="info-val"><strong>{{ data.stats.trainees_total|default:0 }} чел.</strong></span></li>
+                </ul>
+
+                <div class="sub-block">
+                    <div class="sub-title">Прием студентов</div>
+                    <ul class="info-list">
+                        <li>
+                            <span class="info-key">за {{ data.stats.prev_year }} год</span>
+                            <span class="info-val">{{ data.stats.students_prev_year }} чел.</span>
+                        </li>
+                        <li>
+                            <span class="info-key">за {{ data.stats.curr_year }} год</span>
+                            <span class="info-val">
+                                {{ data.stats.students_curr_year }} + {{ data.stats.from_tc }} ч/з ЦПП =
+                                <strong>{{ data.stats.students_curr_year|add:data.stats.from_tc }} чел.</strong>
+                            </span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Списочная численность -->
+    <div class="col-12 col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-people" style="color:var(--accent)"></i>
+                Списочная численность
+            </div>
+            <div class="card-body">
+                <ul class="info-list">
+                    <li>
+                        <span class="info-key">Мужчин</span>
+                        <span class="info-val">{{ data.stats.employees_stats.male_count|default:0 }} чел.
+                            <span class="info-dim">({{ data.stats.employees_stats.male_percent }}%)</span></span>
+                    </li>
+                    <li>
+                        <span class="info-key">Женщин</span>
+                        <span class="info-val">{{ data.stats.employees_stats.female_count|default:0 }} чел.
+                            <span class="info-dim">({{ data.stats.employees_stats.female_percent }}%)</span></span>
+                    </li>
+                    <li>
+                        <span class="info-key">Всего</span>
+                        <span class="info-val"><strong>{{ data.stats.employees_stats.total_emps|default:0 }} чел.</strong></span>
+                    </li>
+                    <li>
+                        <span class="info-key">Средний возраст</span>
+                        <span class="info-val">{{ data.stats.employees_stats.avg_age|default:0 }} г.</span>
+                    </li>
+                    <li>
+                        <span class="info-key">Иногородних работников</span>
+                        <span class="info-val">{{ data.stats.non_local_emps|default:0 }} чел.</span>
+                    </li>
+                    <li>
+                        <span class="info-key">Разница с начала месяца</span>
+                        <span class="info-val" style="color:{% if month_diff > 0 %}#16a34a{% elif month_diff < 0 %}#dc2626{% else %}{% endif %}">
+                            {% if month_diff > 0 %}+{% endif %}{{ month_diff }}
+                        </span>
+                    </li>
+                    <li>
+                        <span class="info-key">Разница с начала года</span>
+                        <span class="info-val" style="color:{% if total_diff > 0 %}#16a34a{% elif total_diff < 0 %}#dc2626{% else %}var{% endif %}">
+                            {% if total_diff > 0 %}+{% endif %}{{ total_diff }}
+                        </span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Кадровые агенства -->
+    <div class="col-12 col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-briefcase" style="color:var(--accent)"></i>
+                Кадровые агенства
+            </div>
+            <div class="card-body">
+                <ul class="info-list">
+                    <li><span class="info-key">ВСП</span><span class="info-val">{{ data.stats.outstaffers_wap|default:0 }} чел.</span></li>
+                    <li><span class="info-key">МСП</span><span class="info-val">{{ data.stats.outstaffers_map|default:0 }} чел.</span></li>
+                    <li><span class="info-key">МП</span><span class="info-val">{{ data.stats.outstaffers_mp|default:0 }} чел.</span></li>
+                    <li><span class="info-key">Всего</span><span class="info-val"><strong>{{ data.stats.outstaffers_total|default:0 }} чел.</strong></span></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Пенсионеры -->
+    <div class="col-12 col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-person-check" style="color:var(--accent)"></i>
+                Пенсионеры
+            </div>
+            <div class="card-body">
+                <ul class="info-list">
+                    <li><span class="info-key">Расчёт за 2025 г.</span><span class="info-val">536 чел.</span></li>
+                    <li><span class="info-key">Возврат за 2025 г.</span><span class="info-val">100 чел. <span class="info-dim">(18,7%)</span></span></li>
+                    {% for p in data.stats.pensioners_left %}
+                        <li><span class="info-key">Расчёт за {{ p.year }} г.</span><span class="info-val">{{ p.count|default:0 }} чел.</span></li>
+                    {% endfor %}
+                    {% for p in data.stats.pensioners_return %}
+                        <li><span class="info-key">Возврат за {{ p.year }} г.</span>
+                            <span class="info-val">{{ p.count|default:0 }} чел.
+                                <span class="info-dim">({{ data.stats.pensioners_percent|default:0 }}%)</span></span></li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- После СВО -->
+    <div class="col-12 col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-shield" style="color:var(--accent)"></i>
+                После СВО
+            </div>
+            <div class="card-body">
+                <ul class="info-list">
+                    {% for z in data.stats.zov_count %}
+                        {% if z.year == data.stats.curr_year %}
+                            <li>
+                                <span class="info-key">за {{ z.year }} год</span>
+                                <span class="info-val">{{ z.count }} чел.
+                                    <span class="info-dim">в т.ч. за {{ data.stats.curr_month }} &mdash; {{ data.stats.zov_count_curr_month }} чел.</span></span>
+                            </li>
+                        {% else %}
+                            <li><span class="info-key">за {{ z.year }} год</span><span class="info-val">{{ z.count }} чел.</span></li>
+                        {% endif %}
+                    {% endfor %}
+                    <li><span class="info-key">Всего</span><span class="info-val"><strong>{{ data.stats.zov_total }} чел.</strong></span></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- После службы в РА -->
+    <div class="col-12 col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-award" style="color:var(--accent)"></i>
+                После службы в РА
+            </div>
+            <div class="card-body">
+                <ul class="info-list">
+                    <li><span class="info-key">За 2024 г.</span><span class="info-val">130 чел. <span class="info-dim">(56 &mdash; возврат)</span></span></li>
+                    <li><span class="info-key">За 2025 г.</span><span class="info-val">114 чел. <span class="info-dim">(57 &mdash; возврат)</span></span></li>
+                    {% for i, j in data.stats.army %}
+                        <li><span class="info-key">За {{ i.year }} г.</span>
+                            <span class="info-val">{{ i.count }} чел. <span class="info-dim">({{ j.count }} &mdash; возврат)</span></span></li>
+                    {% endfor %}
+                    <li>
+                        <span class="info-key">За {{ data.stats.curr_month }} {{ data.stats.curr_year }} г.</span>
+                        <span class="info-val">{{ data.stats.army_curr_month_left }} чел.
+                            <span class="info-dim">({{ data.stats.army_curr_month_return }} &mdash; возврат)</span></span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Численность по производствам -->
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-table" style="color:var(--accent)"></i>
+        Численность на {{ data.details_date }}
+    </div>
+    <div class="table-container">
+        <table class="table mb-0">
+            <thead>
+                <tr>
+                    <th style="min-width:200px">Производство</th>
+                    <th style="text-align:center;min-width:70px">Основные, чел</th>
+                    <th style="text-align:center;min-width:60px">Основные, %</th>
+                    <th style="text-align:center;min-width:70px">Вспомогательные, чел</th>
+                    <th style="text-align:center;min-width:60px">Вспомогательные, %</th>
+                    <th style="text-align:center;min-width:70px">РСС, чел</th>
+                    <th style="text-align:center;min-width:60px">РСС, %</th>
+                    <th style="text-align:center;min-width:70px">Ученики, чел</th>
+                    <th style="text-align:center;min-width:60px">Ученики, %</th>
+                    <th style="text-align:center;min-width:70px">Общество, чел</th>
+                    <th style="text-align:center;min-width:60px">Общество, %</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in data.stats.headcount_table.headcount_stats %}
+                    <tr>
+                        <td style="font-weight:500;color:var(--text-primary)">{{ item.production__name }}</td>
+                        <td style="text-align:center;font-weight:600">{{ item.dl_count }}</td>
+                        <td style="text-align:center;color:var">{{ item.dl_percent }}%</td>
+                        <td style="text-align:center;font-weight:600">{{ item.idl_count }}</td>
+                        <td style="text-align:center;color:var">{{ item.idl_percent }}%</td>
+                        <td style="text-align:center;font-weight:600">{{ item.mss_count }}</td>
+                        <td style="text-align:center;color:var">{{ item.mss_percent }}%</td>
+                        <td style="text-align:center;font-weight:600">{{ item.trainees_count }}</td>
+                        <td style="text-align:center;color:var">{{ item.trainees_percent }}%</td>
+                        <td style="text-align:center;font-weight:600">{{ item.total_count }}</td>
+                        <td style="text-align:center;color:var">{{ item.total_percent }}%</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="11" style="text-align:center;padding:40px;color:var">
+                            <i class="bi bi-inbox" style="font-size:28px;display:block;margin-bottom:8px"></i>
+                            Нет данных
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+
+            {% if data.stats.headcount_table.headcount_stats %}
+            <tfoot>
+                <tr class="total-row">
+                    <td style="font-weight:700;color:var(--text-primary)">ВСЕГО</td>
+                    <td style="text-align:center;font-weight:700">{{ data.stats.headcount_table.headcount_summary.dl }}</td>
+                    <td></td>
+                    <td style="text-align:center;font-weight:700">{{ data.stats.headcount_table.headcount_summary.idl }}</td>
+                    <td></td>
+                    <td style="text-align:center;font-weight:700">{{ data.stats.headcount_table.headcount_summary.mss }}</td>
+                    <td></td>
+                    <td style="text-align:center;font-weight:700">{{ data.stats.headcount_table.headcount_summary.trainees }}</td>
+                    <td></td>
+                    <td style="text-align:center;font-weight:700">{{ data.stats.headcount_table.headcount_summary.all }}</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+</div>
+
+<style>
+/* --- Списки "ключ — значение" --- */
+.info-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.info-list > li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 7px 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+}
+.info-list > li:last-child {
+    border-bottom: none;
+}
+.info-key {
+    color: var(--text-secondary);
+}
+.info-val {
+    color: var(--text-primary);
+    text-align: right;
+    white-space: nowrap;
+}
+.info-dim {
+    font-size: 14px;
+    white-space: normal;
+}
+
+/* --- Вложенный блок "Прием студентов" --- */
+.sub-block {
+    margin-top: 14px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface-2);
+}
+.sub-title {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: .02em;
+    margin-bottom: 6px;
+}
+
+/* --- Таблица численности --- */
+.total-row {
+    background: var(--surface-3);
+    border-top: 2px solid var(--border);
+}
+.table-container {
+    max-height: 60vh;
+    overflow-y: auto;
+    overflow-x: auto;
+    display: block;
+}
+.table-container table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.table-container thead th {
+    position: sticky;
+    top: 0;
+    background: #f0f0f0;
+    z-index: 2;
+}
+</style>
+
+{% endblock %}
