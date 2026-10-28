@@ -1,6 +1,8 @@
 from django.db import models
+from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
+import secrets
  
  
 class Production(models.Model):
@@ -618,3 +620,71 @@ class Salary(models.Model):
 
     def __str__(self):
         return f'{self.employee} - {self.main_sum + self.vacation_sum}'
+    
+class APIAccessKey(models.Model):
+    user = models.ForeignKey(
+        User,
+        verbose_name='Пользователь',
+        on_delete=models.CASCADE,
+        related_name='api_keys'
+    )
+    key = models.CharField(
+        'API ключ',
+        max_length=64,
+        unique=True,
+        editable=False
+    )
+    name = models.CharField(
+        'Название ключа',
+        max_length=100
+    )
+    is_active = models.BooleanField(
+        'Активен',
+        default=True
+    )
+    created_at = models.DateTimeField(
+        'Создан',
+        auto_now_add=True,
+    )
+    last_used = models.DateTimeField(
+        'Последнее использование',
+        null=True,
+        blank=True
+    )
+    expires_at = models.DateTimeField(
+        'Истекает',
+        null=True,
+        blank=True
+    )
+
+    class Meta:
+        verbose_name = 'API ключ'
+        verbose_name_plural = 'API ключи'
+
+    def save(self, *args, **kwargs):
+        if not self.key:
+            self.key = self.generate_key()
+
+        if self.is_active:
+            existing_active = APIAccessKey.objects.filter(
+                user=self.user,
+                is_active=True
+            ).exclude(pk=self.pk)
+
+        if existing_active.exists():
+            raise ValidationError(f"Пользователь {self.user.username} уже умеет активный ключ.")
+        super().save(*args, **kwargs)
+
+    @staticmethod
+    def generate_key():
+        return secrets.token_urlsafe(32)
+    
+    def is_valid(self):
+        if not self.is_active:
+            return False
+        if self.expires_at and self.expires_at < timezone.now():
+            return False
+        return True
+    
+    def __str__(self):
+        return f"{self.name} ({self.user.username})"

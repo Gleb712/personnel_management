@@ -14,9 +14,12 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Загрузка переменных из .env
+load_dotenv()
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -24,12 +27,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-b1la+a&#pb%+ks9%glkewxbhe0h$-ik#++-715rrbn8he=g^0&'
 
-load_dotenv()
-
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'True')
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ['10.10.10.37', '127.0.0.1', 'localhost', '10.109.42.51', '10.109.42.49']
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
 
 
 # Application definition
@@ -41,7 +42,12 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
     'core',
+    'students',
+
+    # Единый вход через сервис авторизации (настройки SSO_* в .env, см. sso_client/conf.py)
+    'sso_client',
 ]
 
 MIDDLEWARE = [
@@ -68,6 +74,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'core.context_processors.user_permissions',
+                'students.context_processors.students_access',
             ],
         },
     },
@@ -82,12 +89,12 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME_PERS', 'personnel_management_test'),
-        'USER': 'root',
-        'PASSWORD': 'root',
-        'HOST': os.getenv('DB_HOST', '10.10.10.37'),
-        'PORT': '5432',
-    }
+        'NAME': os.environ['DB_NAME'],
+        'USER': os.environ['DB_USER'],
+        'PASSWORD': os.environ['DB_PASSWORD'],
+        'HOST': os.environ.get('DB_HOST', 'localhost'),
+        'PORT': os.environ.get('DB_PORT', '5432'),
+    },
 }
 
 
@@ -128,7 +135,7 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
-    BASE_DIR / 'static',
+        BASE_DIR / 'static',
     ]
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
@@ -139,3 +146,28 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Ограничение размера загружаемых файлов (10 MB)
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 мегабайт
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 мегабайт
+
+# BASTION API
+API_READY_ENDPOINT = 'http://127.0.0.1:8080/ready'
+API_HEALTH_ENDPOINT = 'http://127.0.0.1:8080/health'
+API_SETTINGS_ENDPOINT = 'http://127.0.0.1:8082/api/settings'
+
+ORACLE_STUDENTS = {
+    'USER': os.getenv('ORACLE_USER', ''),
+    'PASSWORD': os.getenv('ORACLE_PASSWORD', ''),
+    'DSN': os.getenv('ORACLE_DSN', ''),
+    'CLIENT_LIB_DIR': os.getenv('ORACLE_CLIENT_LIB_DIR', ''),
+}
+
+# Вход и выход выполняет сервис авторизации (sso_client, настройки SSO_* в .env)
+LOGIN_URL = '/sso/login/'
+
+# За nginx: адрес и схема берутся из заголовков прокси (nginx должен передавать Host и X-Forwarded-Proto).
+USE_X_FORWARDED_HOST = os.getenv('USE_X_FORWARDED_HOST', 'False').lower() in ('1', 'true', 'yes')
+if os.getenv('SECURE_PROXY_SSL_HEADER', 'False').lower() in ('1', 'true', 'yes'):
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()]
+
+# Имена cookie: у сервисов на одном адресе (разные порты или пути) они должны различаться.
+SESSION_COOKIE_NAME = os.getenv('SESSION_COOKIE_NAME', 'hr_sessionid')
+CSRF_COOKIE_NAME = os.getenv('CSRF_COOKIE_NAME', 'hr_csrftoken')

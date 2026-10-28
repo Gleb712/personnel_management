@@ -1,0 +1,15 @@
+{% if oracle %}
+<div class="card-section readonly-block">
+    <div class="section-title">
+        <i class="bi bi-lock me-1"></i>Обновляется автоматически, не редактируется
+    </div>
+    <div class="field-grid">
+        {% for label, value in oracle %}
+        <div>
+            <div class="field-label">{{ label }}</div>
+            <div class="field-value">{{ value }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}

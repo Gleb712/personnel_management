@@ -1,0 +1,23 @@
+<div class="d-flex justify-content-end mb-2">
+    <button type="button" class="btn btn-primary btn-sm"
+            hx-get="{% url 'students:tab' student.pk tab %}?edit=1"
+            hx-target="#tab-{{ student.pk }}">
+        <i class="bi bi-pencil me-1"></i>Редактировать
+    </button>
+</div>
+
+{% include 'students/partials/oracle_block.html' %}
+
+{% for title, fields in sections %}
+<div class="card-section">
+    <div class="section-title">{{ title }}</div>
+    <div class="field-grid">
+        {% for label, value in fields %}
+        <div>
+            <div class="field-label">{{ label }}</div>
+            <div class="field-value">{{ value|linebreaksbr }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}

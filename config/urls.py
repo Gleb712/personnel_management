@@ -19,9 +19,14 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+from sso_client.urls import overrides as sso_overrides
+
 urlpatterns = [
+    *sso_overrides,
+    path('sso/', include('sso_client.urls')),
     path('admin/', admin.site.urls),
     path('', include('core.urls', namespace='core')),
+    path('students/', include('students.urls', namespace='students')),
 ]
 
 if settings.DEBUG:

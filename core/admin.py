@@ -9,7 +9,7 @@ from core.models import (
     Employee, Production, Workshop,
     DismissalReason, EmployeeCategory, Position,
     UserProfile, HireSource, EmployeeGrades,
-    HireCategory,
+    HireCategory, APIAccessKey
 )
 
 GROUP_META = {
@@ -341,3 +341,25 @@ class HireCategoryAdmin(admin.ModelAdmin):
     @admin.display(description='Использований')
     def get_count(self, obj):
         return obj.hire_category.count()  
+    
+@admin.register(APIAccessKey)
+class APIAccessKeyAdmin(admin.ModelAdmin):
+    list_display = [
+        'name', 'user', 'key',
+        'is_active', 'created_at', 'last_used',
+        'expires_at'
+    ]
+    list_filter = ['is_active', 'created_at', 'user__username']
+    search_fields = ['name', 'key', 'user__username']
+    readonly_fields = ['key', 'created_at', 'last_used']
+
+    fieldsets = (
+        ('Основное', {'fields': ('user', 'name', 'key')}),
+        ('Статус', {'fields': ('is_active', 'expires_at')}),
+        ('Информация', {'fields': ('created_at', 'last_used'), 'classes': ('collapse',)})
+    )
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.key = APIAccessKey.generate_key()
+        return super().save_model(request, obj, form, change)

@@ -2,24 +2,32 @@ import json
  
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.forms import AuthenticationForm
 from django.core.paginator import Paginator
 from django.db.models import Q, F, ExpressionWrapper, IntegerField, fields
+from django.forms.models import model_to_dict
 from django.db.models.functions import Coalesce
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from datetime import datetime
 from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_control
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
+from django.core.serializers.json import DjangoJSONEncoder
+from django.conf import settings
  
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+
+import requests
  
-from .forms import FileUploadForm, EmployeeEditForm
+from .forms import FileUploadForm, EmployeeEditForm, ApiRequestForm
 from .permissions import can_upload, can_edit, can_view, can_view_additional_info
 from core.services.file_processor import *
 from core.services.report_service import get_movement_report
-from .models import Employee, Production, Workshop, EmployeeTransfers, EmployeeCategory, Salary
+from .models import Employee, Production, Workshop, EmployeeTransfers, EmployeeCategory, Salary, APIAccessKey
+from .services.bastion_api import BastionApi
+from .decorators import api_key_required
 
 from core.permissions import login_required_custom
 
@@ -71,29 +79,6 @@ def _style_total_row(ws, row_num):
         cell.font = total_font
         cell.fill = total_fill
 
-def login_view(request):
-    """Страница входа. После успешной авторизации редиректит по роли."""
-    if request.user.is_authenticated:
-        return _redirect_by_role(request.user)
- 
-    if request.method == 'POST':
-        form = AuthenticationForm(request, data=request.POST)
-        if form.is_valid():
-            user = form.get_user()
-            login(request, user)
-            return _redirect_by_role(user)
-        else:
-            messages.error(request, 'Неверный логин или пароль')
-    else:
-        form = AuthenticationForm()
- 
-    return render(request, 'authorization/login.html', {'form': form})
- 
-def logout_view(request):
-    """Выход из системы"""
-    logout(request)
-    return redirect('core:login')
- 
 def access_denied(request):
     """Страница 403 — недостаточно прав"""
     return render(request, 'authorization/access_denied.html', status=403)
@@ -1069,43 +1054,12 @@ def report_movement_export(request):
 def profile_view(request):
     """
     Страница профиля пользователя.
-    Показывает данные учётной записи и форму смены пароля.
-    При успешной смене пароля пользователь остаётся залогинен.
+    Показывает данные учётной записи. Пароль меняется в сервисе авторизации.
     """
-    from django.contrib.auth import update_session_auth_hash
     from core.models import UserProfile
- 
-    user = request.user
-    profile, _ = UserProfile.objects.get_or_create(user=user)
- 
-    error = None
- 
-    if request.method == 'POST':
-        current_password = request.POST.get('current_password', '')
-        new_password     = request.POST.get('new_password', '')
-        confirm_password = request.POST.get('confirm_password', '')
- 
-        if not user.check_password(current_password):
-            error = 'Неверный текущий пароль'
-        elif new_password != confirm_password:
-            error = 'Новые пароли не совпадают'
-        elif len(new_password) < 8:
-            error = 'Пароль должен содержать не менее 8 символов'
-        elif new_password.isdigit():
-            error = 'Пароль не должен состоять только из цифр'
-        elif user.check_password(new_password):
-            error = 'Новый пароль не должен совпадать с текущим'
-        else:
-            user.set_password(new_password)
-            user.save()
-            update_session_auth_hash(request, user)
-            messages.success(request, 'Пароль успешно изменён')
-            return redirect('core:profile')
- 
-    return render(request, 'core/profile.html', {
-        'profile': profile,
-        'error':   error,
-    })
+
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    return render(request, 'core/profile.html', {'profile': profile})
 
 @can_view
 def dashboard(request):
@@ -1321,6 +1275,7 @@ def transfers_details(request):
 
     return render(request, 'core/reports/transfers_details.html', {'data': data})
 
+@can_view
 def report_table(request):
     from core.services.report_service import get_table_report
     from datetime import date, timedelta, datetime
@@ -1333,3 +1288,159 @@ def report_table(request):
 
     data = get_table_report(ddate)   
     return render(request, 'core/reports/report_table.html', {'data': data})
+
+@cache_control(no_cache=True, must_revalidate=True, no_store=True)
+def bastion(request):
+    checker = BastionApi()
+    
+    token = request.session.get('api_token', None)
+    status_data = checker.get_full_status(token)
+    
+    # Получаем текущие настройки если есть токен
+    settings_data = None
+    if token:
+        settings_result = checker.get_settings(token)
+        if settings_result['success']:
+            settings_data = settings_result['settings']
+    
+    if request.method == 'POST':
+        form = ApiRequestForm(request.POST)
+        if form.is_valid():
+            method = form.cleaned_data['method']
+            key = form.cleaned_data['setting_key']
+            token = form.cleaned_data['token']
+            value = form.cleaned_data.get('value')
+            
+            request.session['api_token'] = token
+            
+            result = checker.send_api_request(method, key, token, value)
+            
+            if result['success']:
+                messages.success(request, f'✅ Запрос {method} к "/api/settings/{key if method == "PATCH" else ""}" выполнен успешно')
+                if method == 'GET':
+                    messages.info(request, 'Получены текущие настройки')
+                else:
+                    messages.info(request, f'Новое значение: {result.get("value")}')
+            else:
+                error_msg = result.get('error', 'Неизвестная ошибка')
+                status_code = result.get('status_code', '')
+                if status_code == 400:
+                    messages.error(request, f'❌ Ошибка 400: Значение вне допустимых границ')
+                elif status_code == 401:
+                    messages.error(request, f'❌ Ошибка 401: Неверный или отсутствующий токен')
+                elif status_code == 404:
+                    messages.error(request, f'❌ Ошибка 404: Неизвестный ключ настройки')
+                else:
+                    messages.error(request, f'❌ Ошибка: {error_msg}')
+            
+            request.session['last_api_result'] = json.dumps(result, cls=DjangoJSONEncoder)
+            return redirect('core:bastion')
+    else:
+        form = ApiRequestForm()
+        if token:
+            form.fields['token'].initial = token
+    
+    last_result = None
+    if 'last_api_result' in request.session:
+        try:
+            last_result = json.loads(request.session['last_api_result'])
+            del request.session['last_api_result']
+        except:
+            pass
+    
+    context = {
+        'status_data': status_data,
+        'form': form,
+        'settings_data': settings_data,
+        'overall_status': status_data['overall_status'],
+        'ready_status': status_data['ready']['is_ready'],
+        'ready_detail': status_data['ready']['detail'],
+        'is_healthy': status_data['health']['is_healthy'],
+        'jobs': status_data['health']['jobs'],
+        'error': status_data['ready'].get('error', False) or status_data['health'].get('error', False),
+        'last_result': last_result,
+        'has_token': bool(token),
+        'api_settings_url': settings.API_SETTINGS_ENDPOINT,
+    }
+    
+    return render(request, 'core/bastion/bastion.html', context)
+
+@cache_control(no_cache=True, must_revalidate=True, no_store=True)
+def api_status_json(request):
+    checker = BastionApi()
+    token = request.GET.get('token') or request.session.get('api_token')
+    status_data = checker.get_full_status(token)
+    return JsonResponse(status_data, encoder=DjangoJSONEncoder, safe=False)
+
+@csrf_exempt
+@cache_control(no_cache=True, must_revalidate=True, no_store=True)
+def api_send_request(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST method allowed'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        method = data.get('method', 'GET')
+        key = data.get('key', '')
+        token = data.get('token', '')
+        value = data.get('value')
+        
+        if not token:
+            return JsonResponse({'error': 'Token is required'}, status=400)
+        
+        checker = BastionApi()
+        result = checker.send_api_request(method, key, token, value)
+        
+        return JsonResponse(result, encoder=DjangoJSONEncoder, safe=False)
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
+@api_key_required
+@require_http_methods(["GET"])
+def api_get_employee(request, tab_number):
+    try:
+        employee = Employee.objects.filter(
+            employee_number=tab_number
+        ).values(
+            'employee_number',
+            'full_name',
+            'birth_date',
+            'hire_date',
+            'dismissal_date',
+            'production__name',
+            'workshop__number',
+            'position__name'
+        ).get()
+
+        api_key = []
+
+        if APIAccessKey.objects.filter(is_active=True, user__username=tab_number).exists():
+            api_key = APIAccessKey.objects.filter(
+                is_active=True, 
+                user__username=tab_number
+            ).values(
+                'key',
+                'expires_at'
+            ).get()
+
+        return JsonResponse({
+            'tab_number': employee.get('employee_number'),
+            'surname': employee.get('full_name').split(' ')[0],
+            'name': employee.get('full_name').split(' ')[1],
+            'patronymic': employee.get('full_name').split(' ')[2] if employee.get('full_name').split(' ')[2] else None,
+            'birth_date': employee.get('birth_date'),
+            'hire_date': employee.get('hire_date'),
+            'dismissal_date': employee.get('dismissal_date'),
+            'production': employee.get('production__name'),
+            'department': employee.get('workshop__number'),
+            'position': employee.get('position__name'),
+            'is_fired': True if employee.get('dismissal_date') else False,
+            'api_key': api_key.get('key') if api_key else None
+        })
+    except Employee.DoesNotExist:
+        return JsonResponse({
+            'error': 'Сотрдуник не найден'
+        }, status=404)

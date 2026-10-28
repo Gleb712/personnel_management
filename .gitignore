@@ -5,8 +5,10 @@
 *.xlsx
 /wheels
 /staticfiles
+/media
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .env
+.ignore

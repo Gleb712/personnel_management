@@ -1,0 +1,15 @@
+{% extends "base_auth.html" %}
+
+{% block title %}Нет учётной записи{% endblock %}
+
+{% block content %}
+  <h2>Нет доступа</h2>
+  <div class="error-msg" role="alert">
+    <i class="bi bi-exclamation-circle-fill"></i>
+    <span>Вы вошли как {{ username }}, но в этом сервисе для вас нет учётной записи. Обратитесь к администратору сервиса.</span>
+  </div>
+  <form method="post" action="{% url 'sso_client:logout' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn-login">Выйти</button>
+  </form>
+{% endblock %}

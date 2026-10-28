@@ -1,0 +1,29 @@
+<tr class="student-row" id="row-{{ s.pk }}"
+    data-id="{{ s.pk }}"
+    data-card-url="{% url 'students:card' s.pk %}"
+    hx-get="{% url 'students:row' s.pk %}"
+    hx-trigger="student-updated-{{ s.pk }} from:body"
+    hx-swap="outerHTML">
+    <td><code>{{ s.employee_number }}</code></td>
+    <td style="font-weight:500">{{ s.full_name }}</td>
+    <td style="color:var(--text-secondary)">{{ s.get_admission_kind_display }}</td>
+    <td style="color:var(--text-secondary)">{{ s.institution|default:"—" }}</td>
+    <td>{{ s.current_course|default:"—" }}</td>
+    <td style="color:var(--text-secondary)">{{ s.get_study_form_display|default:"—" }}</td>
+    <td style="color:var(--text-secondary)">{{ s.get_payment_method_display }}</td>
+    <td>
+        {% if s.last_grade %}
+            <span class="grade-badge grade-{{ s.last_grade }}">{{ s.last_grade_label }}</span>
+        {% else %}
+            <span style="color:var(--text-muted)">—</span>
+        {% endif %}
+    </td>
+    <td>
+        {% if s.is_studying %}
+            <span class="badge-active">Учится</span>
+        {% else %}
+            <span class="badge-dismissed">Отчислен</span>
+        {% endif %}
+    </td>
+    <td class="text-end"><i class="bi bi-chevron-down row-chevron"></i></td>
+</tr>

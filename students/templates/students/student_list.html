@@ -1,0 +1,226 @@
+{% extends 'base.html' %}
+{% block title %}Студенты{% endblock %}
+{% block page_title %}Студенты{% endblock %}
+{% block nav_students %}active{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-primary btn-sm"
+        hx-post="{% url 'students:sync' %}"
+        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+        hx-target="#sync-result"
+        hx-disabled-elt="this">
+    <span class="htmx-indicator spinner-border spinner-border-sm me-1"></span>
+    <i class="bi bi-arrow-repeat me-1"></i>Обновить из Oracle
+</button>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .card-slot { display: none; }
+    .card-slot.open { display: table-row; }
+    .card-slot > td { padding: 0 !important; background: var(--surface-2) !important; }
+    .table tbody tr.card-slot:hover > td { background: var(--surface-2) !important; }
+    .student-row { cursor: pointer; }
+    .student-row .row-chevron { color: var(--text-muted); transition: transform .15s; }
+    .table tbody tr.student-row:has(+ .card-slot.open) td { background: var(--accent-dim) !important; }
+    .student-row:has(+ .card-slot.open) .row-chevron { transform: rotate(180deg); color: var(--accent); }
+
+    .student-card { margin: 12px 16px 16px; background: var(--surface);
+                    border: 1px solid var(--border); border-left: 3px solid var(--accent);
+                    border-radius: 8px; cursor: default; }
+    .student-card-head { padding: 14px 18px 0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .student-card-name { font-weight: 600; font-size: 15px; }
+    .student-tabs { display: flex; gap: 4px; padding: 10px 18px 0; border-bottom: 1px solid var(--border); }
+    .student-tab { border: none; background: none; padding: 8px 12px; font-size: 13px; font-weight: 500;
+                   color: var(--text-secondary); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .student-tab:hover { color: var(--text-primary); }
+    .student-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .student-tab-body { padding: 16px 18px; }
+
+    .card-section { margin-bottom: 18px; }
+    .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase;
+                     letter-spacing: .05em; color: var(--text-muted); margin-bottom: 8px; }
+    .field-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 18px; }
+    .field-wide { grid-column: 1 / -1; }
+    .field-grid > div:only-child { grid-column: 1 / -1; }
+    .field-label { font-size: 12px; color: var(--text-muted); }
+    .field-value { font-size: 13px; color: var(--text-primary); word-break: break-word; }
+    .readonly-block { background: var(--surface-2); border-radius: 6px; padding: 10px 12px; }
+
+    .grade-badge { display: inline-block; border-radius: 20px; padding: 3px 9px; font-size: 11px; font-weight: 600; }
+    .grade-5 { background: #dcfce7; color: #15803d; }
+    .grade-4 { background: #dbeafe; color: #1d4ed8; }
+    .grade-3 { background: #fef9c3; color: #a16207; }
+    .grade-2 { background: #fee2e2; color: #dc2626; }
+
+    .study-grid { width: 100%; border-collapse: separate; border-spacing: 8px; margin: -8px; }
+    /* Сетка лежит внутри общей .table — отключаем её фон, рамки и подсветку при наведении */
+    .table .student-card .study-grid th,
+    .table .student-card .study-grid td { background: transparent !important; border: 0 !important; }
+    .study-grid thead th { font-size: 11px; font-weight: 600; text-transform: uppercase;
+                           letter-spacing: .05em; color: var(--text-muted); padding: 0 4px; }
+    .study-grid td { width: 42%; vertical-align: top; padding: 0; }
+    .study-year { font-size: 13px; font-weight: 600; color: var(--text-primary); vertical-align: top; padding-top: 10px !important; }
+    .study-course { font-size: 11px; font-weight: 500; color: var(--text-muted); }
+    .cert { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: var(--surface); }
+    .cert-meta { font-size: 12px; color: var(--text-secondary); }
+    .cert-actions { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; }
+    .cert-actions a { color: var(--accent); text-decoration: none; }
+    .cert-btn { border: none; background: none; color: var(--text-muted); padding: 2px 6px; border-radius: 4px; }
+    .cert-btn:hover { background: var(--surface-3); color: var(--text-primary); }
+    .cert-btn-danger:hover { background: #fee2e2; color: var(--red); }
+    .cert-current { display: inline-block; font-size: 10px; font-weight: 600; color: var(--green);
+                    border: 1px solid #bbf7d0; background: #f0fdf4; border-radius: 4px; padding: 1px 6px; }
+    .cert-add { width: 100%; min-height: 74px; border: 1px dashed var(--border-strong); border-radius: 8px;
+                background: transparent; color: var(--text-muted); font-size: 12px; }
+    .cert-add:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+    .pg-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 32px;
+              padding: 0 8px; border-radius: 6px; font-size: 13px; color: var(--text-secondary);
+              background: var(--surface-2); border: 1px solid var(--border); text-decoration: none; }
+    .pg-btn:hover { background: var(--surface-3); color: var(--text-primary); }
+    .pg-btn.pg-disabled { opacity: .3; pointer-events: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Фильтры -->
+<div class="card mb-3">
+    <div class="card-body" style="padding:14px 18px">
+        <form id="student-filters" class="row g-2 align-items-end"
+              hx-get="{% url 'students:list' %}"
+              hx-target="#table-wrap"
+              hx-trigger="input delay:350ms"
+              hx-push-url="true">
+            <div class="col-lg-3 col-md-6">
+                <label class="form-label">ФИО или табельный номер</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" name="search" value="{{ f.search }}" placeholder="Иванов Иван">
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <label class="form-label">Учебное заведение</label>
+                <select class="form-select form-select-sm" name="institution">
+                    <option value="">Все</option>
+                    {% for i in institutions %}
+                    <option value="{{ i.pk }}" {% if f.institution == i.pk|stringformat:"s" %}selected{% endif %}>{{ i }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-4">
+                <label class="form-label">Вид приёма</label>
+                <select class="form-select form-select-sm" name="admission_kind">
+                    <option value="">Все</option>
+                    {% for value, label in admission_kinds %}
+                    <option value="{{ value }}" {% if f.admission_kind == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-4">
+                <label class="form-label">Статус</label>
+                <select class="form-select form-select-sm" name="status">
+                    <option value="">Все</option>
+                    <option value="studying" {% if f.status == 'studying' %}selected{% endif %}>Учится</option>
+                    <option value="dismissed" {% if f.status == 'dismissed' %}selected{% endif %}>Отчислен</option>
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-4">
+                <label class="form-label">Курс</label>
+                <select class="form-select form-select-sm" name="course">
+                    <option value="">Все</option>
+                    {% for c in courses %}
+                    <option value="{{ c }}" {% if f.course == c|stringformat:"s" %}selected{% endif %}>{{ c }} курс</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-4">
+                <label class="form-label">Форма обучения</label>
+                <select class="form-select form-select-sm" name="study_form">
+                    <option value="">Все</option>
+                    {% for value, label in study_forms %}
+                    <option value="{{ value }}" {% if f.study_form == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-4">
+                <label class="form-label">Способ получения</label>
+                <select class="form-select form-select-sm" name="payment_method">
+                    <option value="">Все</option>
+                    {% for value, label in payment_methods %}
+                    <option value="{{ value }}" {% if f.payment_method == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-4">
+                <label class="form-label">Последняя оценка</label>
+                <select class="form-select form-select-sm" name="grade">
+                    <option value="">Все</option>
+                    {% for value, label in grades %}
+                    <option value="{{ value }}" {% if f.grade == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                    <option value="none" {% if f.grade == 'none' %}selected{% endif %}>Нет справок</option>
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-4">
+                <a href="{% url 'students:list' %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-x me-1"></i>Сбросить
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Результат синхронизации -->
+<div id="sync-result" class="mb-3" style="font-size:12px;color:var(--text-muted)">
+    {% if last_sync %}
+        <i class="bi bi-clock-history me-1"></i>
+        Последнее обновление из Oracle: {{ last_sync.started_at|date:"d.m.Y H:i" }} —
+        {% if last_sync.status == 'success' %}успешно{% else %}<span style="color:var(--red)">ошибка</span>{% endif %}
+    {% else %}
+        <i class="bi bi-clock-history me-1"></i>Данные из Oracle ещё не загружались
+    {% endif %}
+</div>
+
+<!-- Перерисовка таблицы после синхронизации. Отдельным элементом,
+     чтобы hx-include не наследовался строками и формами карточки -->
+<div hx-get="{% url 'students:list' %}"
+     hx-trigger="students-synced from:body"
+     hx-target="#table-wrap"
+     hx-include="#student-filters"></div>
+
+<div id="table-wrap">
+    {% include 'students/partials/student_table.html' %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Клик по строке: открыть карточку под ней, повторный клик — закрыть
+    function closeStudentCards() {
+        document.querySelectorAll('tr.card-slot.open').forEach(function (slot) {
+            slot.classList.remove('open');
+            slot.firstElementChild.innerHTML = '';
+        });
+    }
+
+    document.addEventListener('click', function (e) {
+        const row = e.target.closest('tr.student-row');
+        if (!row) return;
+        const slot = document.getElementById('card-' + row.dataset.id);
+        const wasOpen = slot.classList.contains('open');
+        closeStudentCards();
+        if (wasOpen) return;
+        slot.classList.add('open');
+        htmx.ajax('GET', row.dataset.cardUrl, {target: slot.firstElementChild, swap: 'innerHTML'});
+    });
+
+    // Подсветка активной вкладки
+    function activateStudentTab(button) {
+        button.closest('.student-tabs').querySelectorAll('.student-tab').forEach(function (b) {
+            b.classList.toggle('active', b === button);
+        });
+    }
+</script>
+{% endblock %}

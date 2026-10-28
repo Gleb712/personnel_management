@@ -1,0 +1,71 @@
+<div hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <span style="font-size:12px;color:var(--text-muted)">
+            Справок: <strong style="color:var(--text-secondary)">{{ count }}</strong>
+        </span>
+        <span style="font-size:11px;color:var(--text-muted)">
+            <span class="cert-current">действует</span> — справка действует на сегодня
+        </span>
+    </div>
+
+    <table class="study-grid">
+        <thead>
+            <tr>
+                <th style="width:150px">Учебный год</th>
+                {% for number, label in semesters %}<th>{{ label }}</th>{% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <th class="study-year">
+                    {{ row.year }}/{{ row.year|add:1 }}
+                    {% if row.course %}<div class="study-course">{{ row.course }} курс</div>{% endif %}
+                </th>
+                {% for semester, cert in row.cells %}
+                <td>
+                    {% if cert %}
+                    <div class="cert">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="grade-badge grade-{{ cert.grade }}">{{ cert.get_grade_display }}</span>
+                            {% if cert.is_current %}<span class="cert-current">действует</span>{% endif %}
+                        </div>
+                        <div class="cert-meta">
+                            № {{ cert.number }} · {{ cert.valid_from|date:"d.m.Y" }} – {{ cert.valid_to|date:"d.m.Y" }}
+                        </div>
+                        <div class="cert-actions">
+                            {% if cert.scan %}
+                            <a href="{% url 'students:certificate_scan' cert.pk %}" target="_blank">
+                                <i class="bi bi-paperclip"></i>Скан
+                            </a>
+                            {% else %}
+                            <span style="color:var(--text-muted)">без скана</span>
+                            {% endif %}
+                            <span class="ms-auto"></span>
+                            <button type="button" class="cert-btn" title="Изменить"
+                                    hx-get="{% url 'students:certificate_edit' student.pk cert.pk %}"
+                                    hx-target="#tab-{{ student.pk }}">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button type="button" class="cert-btn cert-btn-danger" title="Удалить"
+                                    hx-post="{% url 'students:certificate_delete' student.pk cert.pk %}"
+                                    hx-target="#tab-{{ student.pk }}"
+                                    hx-confirm="Удалить справку № {{ cert.number }} вместе со сканом?">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    {% else %}
+                    <button type="button" class="cert-add"
+                            hx-get="{% url 'students:certificate_new' student.pk %}?year={{ row.year }}&semester={{ semester }}"
+                            hx-target="#tab-{{ student.pk }}">
+                        <i class="bi bi-plus-lg me-1"></i>Добавить справку
+                    </button>
+                    {% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

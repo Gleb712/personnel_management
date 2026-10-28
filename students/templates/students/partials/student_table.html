@@ -1,0 +1,69 @@
+<div class="card">
+    <div class="card-header justify-content-between">
+        <span>
+            <i class="bi bi-mortarboard" style="color:var(--accent)"></i>
+            Найдено: <strong>{{ page_obj.paginator.count }}</strong>
+        </span>
+        <span class="htmx-indicator spinner-border spinner-border-sm" style="color:var(--accent)"></span>
+    </div>
+    <div style="overflow-x:auto">
+        <table class="table mb-0">
+            <thead>
+                <tr>
+                    <th>Таб. №</th>
+                    <th>ФИО</th>
+                    <th>Вид приёма</th>
+                    <th>Учебное заведение</th>
+                    <th>Курс</th>
+                    <th>Форма обучения</th>
+                    <th>Способ получения</th>
+                    <th>Последняя оценка</th>
+                    <th>Статус</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in page_obj %}
+                    {% include 'students/partials/student_row.html' %}
+                    <tr class="card-slot" id="card-{{ s.pk }}"><td colspan="10"></td></tr>
+                {% empty %}
+                <tr>
+                    <td colspan="10" style="text-align:center;padding:48px;color:var(--text-muted)">
+                        <i class="bi bi-inbox" style="font-size:32px;display:block;margin-bottom:8px"></i>
+                        Студенты не найдены
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span style="font-size:12px;color:var(--text-muted)">
+            Показано <strong>{{ page_obj.start_index }}–{{ page_obj.end_index }}</strong> из <strong>{{ page_obj.paginator.count }}</strong>
+        </span>
+        <nav style="display:flex;align-items:center;gap:4px">
+            {% if page_obj.has_previous %}
+            <a class="pg-btn" href="?page={{ page_obj.previous_page_number }}&{{ filter_query }}"
+               hx-get="?page={{ page_obj.previous_page_number }}&{{ filter_query }}" hx-target="#table-wrap" hx-push-url="true">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+            {% else %}
+            <span class="pg-btn pg-disabled"><i class="bi bi-chevron-left"></i></span>
+            {% endif %}
+            <span style="font-size:13px;color:var(--text-secondary);padding:0 8px">
+                {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}
+            </span>
+            {% if page_obj.has_next %}
+            <a class="pg-btn" href="?page={{ page_obj.next_page_number }}&{{ filter_query }}"
+               hx-get="?page={{ page_obj.next_page_number }}&{{ filter_query }}" hx-target="#table-wrap" hx-push-url="true">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            {% else %}
+            <span class="pg-btn pg-disabled"><i class="bi bi-chevron-right"></i></span>
+            {% endif %}
+        </nav>
+    </div>
+    {% endif %}
+</div>

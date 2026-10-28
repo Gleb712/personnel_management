@@ -1,0 +1,26 @@
+{% if log.status == 'success' %}
+<div class="alert alert-success alert-dismissible d-flex flex-column gap-1" role="alert">
+    <span>
+        <i class="bi bi-check-circle-fill me-1"></i>
+        Обновлено из Oracle: новых — <strong>{{ log.created }}</strong>,
+        изменено — <strong>{{ log.updated }}</strong>,
+        без изменений — {{ log.unchanged }},
+        пропущено — {{ log.skipped }}.
+    </span>
+    {% if log.errors %}
+    <details>
+        <summary>Строк с ошибками: {{ log.errors|length }}</summary>
+        <ul class="mb-0 mt-1">
+            {% for error in log.errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+    </details>
+    {% endif %}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% else %}
+<div class="alert alert-danger alert-dismissible" role="alert">
+    <i class="bi bi-x-circle-fill me-1"></i>
+    Синхронизация не выполнена: {{ log.message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}

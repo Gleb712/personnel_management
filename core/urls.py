@@ -1,12 +1,14 @@
 from django.urls import path
+from sso_client import views as sso_views
 from . import views
 
 app_name = 'core'
 
 urlpatterns = [
     # Авторизация
-    path('login/',  views.login_view,    name='login'),
-    path('logout/', views.logout_view,   name='logout'),
+    # Вход и выход - в сервисе авторизации (см. sso_client); имена маршрутов сохранены
+    path('login/',  sso_views.login,     name='login'),
+    path('logout/', sso_views.logout,    name='logout'),
     path('403/',    views.access_denied, name='access_denied'),
  
     # Основные страницы
@@ -46,5 +48,12 @@ urlpatterns = [
     # Подробности по карточкам с категориями
     path('reports/cats_details/<str:emp_category>',     views.categories_details,       name='cats_details'),
 
-    path('reports/table/', views.report_table, name='report_table')
+    path('reports/table/', views.report_table, name='report_table'),
+
+    # API
+    path('api/employee/<str:tab_number>/', views.api_get_employee),
+
+    # Внешний сервис Бастиона
+    path('bastion/',     views.bastion,          name='bastion'),
+    path('api/status/',  views.api_status_json,  name='api_status_json'),
 ]

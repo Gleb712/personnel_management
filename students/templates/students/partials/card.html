@@ -1,0 +1,28 @@
+<div class="student-card">
+    <div class="student-card-head">
+        <span class="student-card-name">{{ student.full_name }}</span>
+        <code>{{ student.employee_number }}</code>
+        <span style="color:var(--text-secondary)">{{ student.get_admission_kind_display }}</span>
+        {% if student.is_studying %}
+            <span class="badge-active">Учится</span>
+        {% else %}
+            <span class="badge-dismissed">Отчислен {{ student.dismissal_date|date:"d.m.Y" }}</span>
+        {% endif %}
+    </div>
+
+    <div class="student-tabs">
+        {% for key, title in tabs %}
+        <button type="button"
+                class="student-tab {% if key == tab %}active{% endif %}"
+                hx-get="{% url 'students:tab' student.pk key %}"
+                hx-target="#tab-{{ student.pk }}"
+                onclick="activateStudentTab(this)">
+            {{ title }}
+        </button>
+        {% endfor %}
+    </div>
+
+    <div class="student-tab-body" id="tab-{{ student.pk }}">
+        {% include tab_template %}
+    </div>
+</div>

@@ -77,3 +77,65 @@ class EmployeeEditForm(forms.ModelForm):
             ),
         }
         
+METHOD_CHOICES = [
+    ('GET', 'GET'),
+    ('PATCH', 'PATCH'),
+]
+
+# Правильные настройки из API
+SETTING_CHOICES = [
+    ('poll_interval_seconds', 'Poll Interval Seconds'),
+    ('cron_hours', 'Cron Hours'),
+    ('cron_minutes', 'Cron Minutes'),
+    ('external_queue_interval_seconds', 'External Queue Interval Seconds'),
+]
+
+class ApiRequestForm(forms.Form):
+    method = forms.ChoiceField(
+        choices=METHOD_CHOICES,
+        label='Метод запроса',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    
+    setting_key = forms.ChoiceField(
+        choices=SETTING_CHOICES,
+        label='Настройка',
+        widget=forms.Select(attrs={'class': 'form-select', 'id': 'setting_key'})
+    )
+    
+    token = forms.CharField(
+        required=True,
+        label='Токен доступа',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Введите api-ключ'
+        })
+    )
+    
+    value = forms.IntegerField(
+        required=False,
+        label='Значение',
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Введите число (только для PATCH)',
+            'id': 'value_field'
+        })
+    )
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        method = cleaned_data.get('method')
+        value = cleaned_data.get('value')
+        
+        if method == 'PATCH':
+            if value is None or value == '':
+                self.add_error('value', 'Для PATCH запроса необходимо указать значение')
+        
+        token = cleaned_data.get('token')
+        if not token:
+            self.add_error('token', 'Токен доступа обязателен')
+        
+        return cleaned_data
+    
+    def get_full_key(self):
+        return self.cleaned_data.get('setting_key')

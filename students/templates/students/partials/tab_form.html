@@ -1,0 +1,43 @@
+<form hx-post="{% url 'students:tab' student.pk tab %}" hx-target="#tab-{{ student.pk }}">
+    {% csrf_token %}
+
+    {% include 'students/partials/oracle_block.html' %}
+
+    {% if form.non_field_errors %}
+    <div class="alert alert-danger">{{ form.non_field_errors|join:" " }}</div>
+    {% endif %}
+
+    {% for title, fields in sections %}
+    <div class="card-section">
+        <div class="section-title">{{ title }}</div>
+        <div class="field-grid">
+            {% for field in fields %}
+            <div class="{% if field.widget_type == 'textarea' %}field-wide{% endif %}">
+                {% if field.widget_type == 'checkbox' %}
+                <div class="form-check" style="margin-top:26px">
+                    {{ field }}
+                    <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                </div>
+                {% else %}
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% endif %}
+                {% if field.help_text %}<div class="form-text" style="font-size:11px">{{ field.help_text }}</div>{% endif %}
+                {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+
+    <div class="d-flex justify-content-end gap-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm"
+                hx-get="{% url 'students:tab' student.pk tab %}"
+                hx-target="#tab-{{ student.pk }}">
+            Отмена
+        </button>
+        <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-check-lg me-1"></i>Сохранить
+        </button>
+    </div>
+</form>
